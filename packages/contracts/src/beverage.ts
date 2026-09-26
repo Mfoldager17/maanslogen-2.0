@@ -34,7 +34,9 @@ export const beverageSchema = z
     vintage: z.number().int().nullable(),
     active: z.boolean(),
     typeId: idSchema,
-    type: beverageTypeSchema.pick({ id: true, slug: true, name: true, categoryId: true }).optional(),
+    type: beverageTypeSchema
+      .pick({ id: true, slug: true, name: true, categoryId: true })
+      .optional(),
     category: categorySchema.pick({ id: true, slug: true, name: true, icon: true }).optional(),
     brandId: idSchema,
     brand: brandSchema.pick({ id: true, slug: true, name: true }).optional(),
@@ -109,7 +111,13 @@ export const beverageListQuerySchema = baseListQuerySchema.extend({
   brandIds: csvQuery(idSchema),
   countryCodes: csvQuery(z.string().length(2)),
   minRating: optionalFloat({ min: 0, max: 5 }),
+  /** Uden dette viser listen kun aktive drikkevarer. */
   active: optionalBoolean(),
+  /**
+   * Tager både aktive og skjulte med. Admin har brug for det; det offentlige
+   * katalog sætter det aldrig, så skjulte drikkevarer aldrig slipper ud ved et uheld.
+   */
+  includeInactive: optionalBoolean(),
   /**
    * Attributfiltre sendes som `attr[alcohol_percent]=4.5-6.0` eller `attr[color]=dark`.
    * Parses af `parseAttributeFilters`.

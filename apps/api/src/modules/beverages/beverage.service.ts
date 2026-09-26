@@ -220,7 +220,9 @@ export class BeverageService {
     await this.assertReferences(input.typeId, input.brandId);
 
     const slug =
-      input.slug && input.slug !== existing.slug ? await this.resolveSlug(input.slug, id) : undefined;
+      input.slug && input.slug !== existing.slug
+        ? await this.resolveSlug(input.slug, id)
+        : undefined;
 
     await this.prisma.$transaction(async (tx) => {
       let mediaId: string | null | undefined;
@@ -298,7 +300,9 @@ export class BeverageService {
 
     return {
       deletedAt: null,
-      ...(query.active === undefined ? { active: true } : { active: query.active }),
+      // Standarden er kun aktive: en skjult drikkevare skal ikke dukke op
+      // i kataloget, bare fordi et filter blev udeladt.
+      ...(query.includeInactive ? {} : { active: query.active ?? true }),
       ...(typeIds.length ? { typeId: { in: typeIds } } : {}),
       ...(brandIds.length ? { brandId: { in: brandIds } } : {}),
       ...(query.categoryId ? { type: { categoryId: query.categoryId } } : {}),
@@ -341,18 +345,16 @@ export class BeverageService {
   }
 
   private buildOrderBy(query: BeverageListQuery): Prisma.BeverageOrderByWithRelationInput[] {
-    const column: Record<BeverageListQuery['sort'], keyof Prisma.BeverageOrderByWithRelationInput> = {
-      name: 'name',
-      createdAt: 'createdAt',
-      rating: 'ratingAverage',
-      reviewCount: 'ratingCount',
-    };
+    const column: Record<BeverageListQuery['sort'], keyof Prisma.BeverageOrderByWithRelationInput> =
+      {
+        name: 'name',
+        createdAt: 'createdAt',
+        rating: 'ratingAverage',
+        reviewCount: 'ratingCount',
+      };
     // Sekundær sortering på id gør cursor-paginationen deterministisk,
     // også når to rækker har samme bedømmelse.
-    return [
-      { [column[query.sort]]: query.order },
-      { id: 'asc' },
-    ];
+    return [{ [column[query.sort]]: query.order }, { id: 'asc' }];
   }
 
   private async assertReferences(typeId?: string, brandId?: string): Promise<void> {
@@ -362,7 +364,8 @@ export class BeverageService {
     }
     if (brandId) {
       const brand = await this.prisma.brand.count({ where: { id: brandId, deletedAt: null } });
-      if (brand === 0) throw AppError.validation('Mærket findes ikke', { brandId: ['Ukendt mærke'] });
+      if (brand === 0)
+        throw AppError.validation('Mærket findes ikke', { brandId: ['Ukendt mærke'] });
     }
   }
 

@@ -29,7 +29,10 @@ export class JwtAuthGuard implements CanActivate {
     const handler = context.getHandler();
     const controller = context.getClass();
 
-    const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [handler, controller]);
+    const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
+      handler,
+      controller,
+    ]);
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
     const token = this.extractToken(request);
 

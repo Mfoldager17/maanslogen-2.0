@@ -109,7 +109,9 @@ describe('validateAttributeValue', () => {
 
 describe('formatAttributeValue', () => {
   it('formaterer tal på dansk med enhed', () => {
-    expect(formatAttributeValue({ dataType: 'NUMBER', unit: '%', options: null }, 5.6)).toBe('5,6 %');
+    expect(formatAttributeValue({ dataType: 'NUMBER', unit: '%', options: null }, 5.6)).toBe(
+      '5,6 %',
+    );
   });
 
   it('oversætter enum-værdier til labels', () => {

@@ -60,7 +60,11 @@ export const createQuestionSchema = z
       });
     }
     if (value.answerType === 'SCALE' && value.scale && value.scale.min >= value.scale.max) {
-      ctx.addIssue({ code: 'custom', path: ['scale'], message: 'Skalaens min skal være mindre end max' });
+      ctx.addIssue({
+        code: 'custom',
+        path: ['scale'],
+        message: 'Skalaens min skal være mindre end max',
+      });
     }
   })
   .meta({ id: 'CreateQuestion' });

@@ -9,5 +9,6 @@ export * from './pagination';
 export * from './primitives';
 export * from './question';
 export * from './review';
+export * from './taste-profile';
 export * from './upload';
 export * from './user';

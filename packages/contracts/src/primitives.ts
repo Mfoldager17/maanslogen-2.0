@@ -13,19 +13,21 @@ export const slugSchema = z
 
 /** Laver et slug ud fra fritekst. Understøtter æ/ø/å. */
 export function slugify(input: string): string {
-  return input
-    // Skal ske før NFD: Å dekomponeres ellers til A + ring, og "Århus" ville
-    // blive til "arhus" i stedet for "aarhus".
-    .replace(/æ/gi, 'ae')
-    .replace(/ø/gi, 'oe')
-    .replace(/å/gi, 'aa')
-    .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, 96)
-    .replace(/-+$/g, '');
+  return (
+    input
+      // Skal ske før NFD: Å dekomponeres ellers til A + ring, og "Århus" ville
+      // blive til "arhus" i stedet for "aarhus".
+      .replace(/æ/gi, 'ae')
+      .replace(/ø/gi, 'oe')
+      .replace(/å/gi, 'aa')
+      .normalize('NFD')
+      .replace(/[̀-ͯ]/g, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 96)
+      .replace(/-+$/g, '')
+  );
 }
 
 /** Emoji eller kort symbol brugt som kategori-ikon. */

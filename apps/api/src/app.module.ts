@@ -35,7 +35,9 @@ import { UserModule } from './modules/users/user.module';
           },
           // Struktureret JSON i produktion; læsbart i udvikling.
           transport:
-            config.NODE_ENV === 'development' ? { target: 'pino-pretty', options: { singleLine: true } } : undefined,
+            config.NODE_ENV === 'development'
+              ? { target: 'pino-pretty', options: { singleLine: true } }
+              : undefined,
           redact: {
             paths: [
               'req.headers.authorization',

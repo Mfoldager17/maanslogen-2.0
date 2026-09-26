@@ -50,7 +50,12 @@ export interface AuthedUser {
 
 export async function registerUser(
   harness: TestHarness,
-  overrides: { email?: string; displayName?: string; password?: string; role?: 'USER' | 'MODERATOR' | 'ADMIN' } = {},
+  overrides: {
+    email?: string;
+    displayName?: string;
+    password?: string;
+    role?: 'USER' | 'MODERATOR' | 'ADMIN';
+  } = {},
 ): Promise<AuthedUser> {
   const email = overrides.email ?? `bruger-${Math.random().toString(36).slice(2, 10)}@test.dk`;
   const password = overrides.password ?? 'Korrekt-Hest-7';
@@ -64,7 +69,10 @@ export async function registerUser(
 
   // Roller tildeles ikke via registrering — den vej ind findes ikke.
   if (overrides.role && overrides.role !== 'USER') {
-    await harness.prisma.user.update({ where: { id: body.user.id }, data: { role: overrides.role } });
+    await harness.prisma.user.update({
+      where: { id: body.user.id },
+      data: { role: overrides.role },
+    });
     const relogin = await harness.request({
       method: 'POST',
       url: '/api/v1/auth/login',

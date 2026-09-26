@@ -39,7 +39,12 @@ export const mediaRenditionInputSchema = z.object({
   storageKey: z.string().min(1).max(512),
   width: z.number().int().positive().max(10_000),
   height: z.number().int().positive().max(10_000),
-  bytes: z.number().int().nonnegative().max(25 * 1024 * 1024).optional(),
+  bytes: z
+    .number()
+    .int()
+    .nonnegative()
+    .max(25 * 1024 * 1024)
+    .optional(),
 });
 
 export const mediaAssetInputSchema = z

@@ -4,16 +4,16 @@ import { z } from 'zod';
  * Konfigurationen valideres én gang ved opstart. Fejler den, starter processen ikke —
  * i stedet for at fejle først når nogen rammer det endpoint der mangler en nøgle.
  */
-const durationSchema = z
-  .string()
-  .regex(/^\d+[smhd]$/, 'Varighed skal være som 15m, 24h eller 30d');
+const durationSchema = z.string().regex(/^\d+[smhd]$/, 'Varighed skal være som 15m, 24h eller 30d');
 
 const envSchema = z
   .object({
     NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
     PORT: z.coerce.number().int().min(1).max(65_535).default(4000),
     HOST: z.string().default('0.0.0.0'),
-    LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
+    LOG_LEVEL: z
+      .enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent'])
+      .default('info'),
 
     DATABASE_URL: z.string().min(1, 'DATABASE_URL mangler'),
 
@@ -84,7 +84,12 @@ const envSchema = z
         }
       }
     } else {
-      for (const key of ['S3_ENDPOINT', 'S3_ACCESS_KEY_ID', 'S3_SECRET_ACCESS_KEY', 'S3_BUCKET'] as const) {
+      for (const key of [
+        'S3_ENDPOINT',
+        'S3_ACCESS_KEY_ID',
+        'S3_SECRET_ACCESS_KEY',
+        'S3_BUCKET',
+      ] as const) {
         if (!env[key]) {
           ctx.addIssue({
             code: 'custom',

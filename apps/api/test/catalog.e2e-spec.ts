@@ -1,5 +1,11 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { registerUser, resetDatabase, startHarness, type AuthedUser, type TestHarness } from './harness';
+import {
+  registerUser,
+  resetDatabase,
+  startHarness,
+  type AuthedUser,
+  type TestHarness,
+} from './harness';
 
 describe('Katalog (e2e)', () => {
   let harness: TestHarness;
@@ -98,7 +104,10 @@ describe('Katalog (e2e)', () => {
     it('kan slås op på både id og slug', async () => {
       const category = (await createCategory()).json();
       const bySlug = await harness.request({ method: 'GET', url: '/api/v1/categories/oel' });
-      const byId = await harness.request({ method: 'GET', url: `/api/v1/categories/${category.id}` });
+      const byId = await harness.request({
+        method: 'GET',
+        url: `/api/v1/categories/${category.id}`,
+      });
       expect(bySlug.statusCode).toBe(200);
       expect(byId.statusCode).toBe(200);
       expect(bySlug.json().id).toBe(byId.json().id);
@@ -106,7 +115,10 @@ describe('Katalog (e2e)', () => {
 
     it('giver 404 — ikke 500 — for et ukendt slug', async () => {
       // Et ikke-UUID mod en uuid-kolonne får ellers Postgres til at fejle på castet.
-      const response = await harness.request({ method: 'GET', url: '/api/v1/categories/findes-ikke' });
+      const response = await harness.request({
+        method: 'GET',
+        url: '/api/v1/categories/findes-ikke',
+      });
       expect(response.statusCode).toBe(404);
       expect(response.json().type).toContain('not-found');
     });
@@ -145,7 +157,12 @@ describe('Katalog (e2e)', () => {
     it('afviser to typer med samme navn i samme kategori', async () => {
       const category = (await createCategory()).json();
       const payload = { categoryId: category.id, name: 'Stout' };
-      await harness.request({ method: 'POST', url: '/api/v1/types', headers: moderator.headers, payload });
+      await harness.request({
+        method: 'POST',
+        url: '/api/v1/types',
+        headers: moderator.headers,
+        payload,
+      });
       const duplicate = await harness.request({
         method: 'POST',
         url: '/api/v1/types',
@@ -197,12 +214,18 @@ describe('Katalog (e2e)', () => {
     });
 
     it('afviser en limit over maksimum', async () => {
-      const response = await harness.request({ method: 'GET', url: '/api/v1/categories?limit=5000' });
+      const response = await harness.request({
+        method: 'GET',
+        url: '/api/v1/categories?limit=5000',
+      });
       expect(response.statusCode).toBe(422);
     });
 
     it('afviser en ødelagt cursor med 400, ikke 500', async () => {
-      const response = await harness.request({ method: 'GET', url: '/api/v1/categories?cursor=%%%' });
+      const response = await harness.request({
+        method: 'GET',
+        url: '/api/v1/categories?cursor=%%%',
+      });
       expect(response.statusCode).toBe(400);
     });
   });

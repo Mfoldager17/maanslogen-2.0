@@ -31,7 +31,9 @@ export interface BeverageRow {
 
 const EMPTY_BUCKETS = { '1': 0, '2': 0, '3': 0, '4': 0, '5': 0 };
 
-export function toRatingSummary(row: Pick<BeverageRow, 'ratingAverage' | 'ratingCount' | 'ratingBuckets'>): RatingSummary {
+export function toRatingSummary(
+  row: Pick<BeverageRow, 'ratingAverage' | 'ratingCount' | 'ratingBuckets'>,
+): RatingSummary {
   const buckets =
     row.ratingBuckets && typeof row.ratingBuckets === 'object' && !Array.isArray(row.ratingBuckets)
       ? (row.ratingBuckets as Record<string, number>)
@@ -59,7 +61,12 @@ export function toBeverageDto(row: BeverageRow): Beverage {
     active: row.active,
     typeId: row.typeId,
     type: row.type
-      ? { id: row.type.id, slug: row.type.slug, name: row.type.name, categoryId: row.type.categoryId }
+      ? {
+          id: row.type.id,
+          slug: row.type.slug,
+          name: row.type.name,
+          categoryId: row.type.categoryId,
+        }
       : undefined,
     category: row.type?.category
       ? {

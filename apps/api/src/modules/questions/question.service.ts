@@ -98,13 +98,15 @@ export class QuestionService {
         answerType: input.answerType,
         required: input.required ?? false,
         sortOrder: input.sortOrder ?? 0,
-        options: (input.options ?? undefined),
-        scale: (input.scale ?? undefined),
+        options: input.options ?? undefined,
+        scale: input.scale ?? undefined,
         active: input.active ?? true,
         ...(input.categoryIds?.length
           ? { categories: { connect: input.categoryIds.map((id) => ({ id })) } }
           : {}),
-        ...(input.typeIds?.length ? { types: { connect: input.typeIds.map((id) => ({ id })) } } : {}),
+        ...(input.typeIds?.length
+          ? { types: { connect: input.typeIds.map((id) => ({ id })) } }
+          : {}),
       },
       include: INCLUDE,
     });

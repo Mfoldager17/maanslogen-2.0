@@ -4,20 +4,9 @@
     "outDir": "./dist",
     "baseUrl": ".",
     "paths": {
-      "@/*": [
-        "src/*"
-      ]
+      "@/*": ["src/*"]
     }
   },
-  "include": [
-    "src/**/*.ts",
-    "test/**/*.ts",
-    "prisma/**/*.ts",
-    "*.config.ts",
-    "eslint.config.mjs"
-  ],
-  "exclude": [
-    "node_modules",
-    "dist"
-  ]
+  "include": ["src/**/*.ts", "test/**/*.ts", "prisma/**/*.ts", "*.config.ts", "eslint.config.mjs"],
+  "exclude": ["node_modules", "dist"]
 }

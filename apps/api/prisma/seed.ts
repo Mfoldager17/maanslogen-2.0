@@ -41,42 +41,78 @@ type QuestionSeed = {
 };
 
 const CATEGORIES = [
-  { name: 'Øl', icon: '🍺', accentColor: '#a8492a', description: 'Fra pilsner til imperial stout.', sortOrder: 1 },
-  { name: 'Vin', icon: '🍷', accentColor: '#7d3b52', description: 'Rød, hvid, rosé og bobler.', sortOrder: 2 },
-  { name: 'Whisky', icon: '🥃', accentColor: '#8a6a3a', description: 'Skotsk, irsk, bourbon og rug.', sortOrder: 3 },
-  { name: 'Gin', icon: '🍸', accentColor: '#2e5e4e', description: 'London Dry, Old Tom og genever.', sortOrder: 4 },
-  { name: 'Rom', icon: '🏝️', accentColor: '#6b4423', description: 'Hvid, gylden og mørk rom.', sortOrder: 5 },
-  { name: 'Cider', icon: '🍏', accentColor: '#5a7a3a', description: 'Æble- og pærecider.', sortOrder: 6 },
+  {
+    name: 'Øl',
+    icon: '🍺',
+    accentColor: '#a8492a',
+    description: 'Fra pilsner til imperial stout.',
+    sortOrder: 1,
+  },
+  {
+    name: 'Vin',
+    icon: '🍷',
+    accentColor: '#7d3b52',
+    description: 'Rød, hvid, rosé og bobler.',
+    sortOrder: 2,
+  },
+  {
+    name: 'Whisky',
+    icon: '🥃',
+    accentColor: '#8a6a3a',
+    description: 'Skotsk, irsk, bourbon og rug.',
+    sortOrder: 3,
+  },
+  {
+    name: 'Gin',
+    icon: '🍸',
+    accentColor: '#2e5e4e',
+    description: 'London Dry, Old Tom og genever.',
+    sortOrder: 4,
+  },
+  {
+    name: 'Rom',
+    icon: '🏝️',
+    accentColor: '#6b4423',
+    description: 'Hvid, gylden og mørk rom.',
+    sortOrder: 5,
+  },
+  {
+    name: 'Cider',
+    icon: '🍏',
+    accentColor: '#5a7a3a',
+    description: 'Æble- og pærecider.',
+    sortOrder: 6,
+  },
 ];
 
 const TYPES: Record<string, { name: string; description: string }[]> = {
-  'Øl': [
+  Øl: [
     { name: 'Pilsner', description: 'Lys, klar og forfriskende.' },
     { name: 'IPA', description: 'Humlet og aromatisk.' },
     { name: 'Stout', description: 'Mørk, ristet og fyldig.' },
     { name: 'Hvedeøl', description: 'Uklar, frugtig og blød.' },
     { name: 'Imperial stout', description: 'Stout med skruen i bund.' },
   ],
-  'Vin': [
+  Vin: [
     { name: 'Rødvin', description: 'Fra let bourgogne til kraftig barolo.' },
     { name: 'Hvidvin', description: 'Frisk syre og frugt.' },
     { name: 'Rosé', description: 'Let og sommerlig.' },
     { name: 'Mousserende', description: 'Champagne, crémant og cava.' },
   ],
-  'Whisky': [
+  Whisky: [
     { name: 'Skotsk single malt', description: 'Én destilleri, én malt.' },
     { name: 'Bourbon', description: 'Majsbaseret og sød.' },
     { name: 'Irsk whisky', description: 'Blød og tredobbelt destilleret.' },
   ],
-  'Gin': [
+  Gin: [
     { name: 'London Dry', description: 'Enebær forrest.' },
     { name: 'Old Tom', description: 'Let sødet.' },
   ],
-  'Rom': [
+  Rom: [
     { name: 'Hvid rom', description: 'Let og til cocktails.' },
     { name: 'Mørk rom', description: 'Karamel og krydderi.' },
   ],
-  'Cider': [
+  Cider: [
     { name: 'Æblecider', description: 'Syrlig og frugtig.' },
     { name: 'Pærecider', description: 'Blødere og sødere.' },
   ],
@@ -281,7 +317,8 @@ const BEVERAGES: {
     brand: 'Mikkeller',
     type: 'Stout',
     country: 'DK',
-    description: 'Oatmeal stout brygget med kaffe. Dyb, ristet og fyldig med en lang bitter afslutning.',
+    description:
+      'Oatmeal stout brygget med kaffe. Dyb, ristet og fyldig med en lang bitter afslutning.',
     attributes: { alcohol_percent: 7.5, ibu: 42, color: 'dark', organic: false, serving_temp: 10 },
   },
   {
@@ -297,7 +334,8 @@ const BEVERAGES: {
     brand: 'Amager Bryghus',
     type: 'Imperial stout',
     country: 'DK',
-    description: 'Dansk imperial stout-klassiker — lakrids, mørk chokolade og en tydelig alkoholvarme.',
+    description:
+      'Dansk imperial stout-klassiker — lakrids, mørk chokolade og en tydelig alkoholvarme.',
     attributes: { alcohol_percent: 10.5, ibu: 70, color: 'dark', organic: false },
   },
   {
@@ -339,7 +377,12 @@ const BEVERAGES: {
     country: 'CL',
     vintage: 2021,
     description: 'Mørke bær, cederträ og bløde tanniner fra Puente Alto.',
-    attributes: { alcohol_percent: 14, grape_variety: ['cabernet_sauvignon'], organic: false, serving_temp: 18 },
+    attributes: {
+      alcohol_percent: 14,
+      grape_variety: ['cabernet_sauvignon'],
+      organic: false,
+      serving_temp: 18,
+    },
   },
   {
     name: 'Blue Slate Riesling',
@@ -348,7 +391,12 @@ const BEVERAGES: {
     country: 'DE',
     vintage: 2022,
     description: 'Stenfrugt, lime og en stram mineralsk syre fra Mosel.',
-    attributes: { alcohol_percent: 11.5, grape_variety: ['riesling'], organic: false, serving_temp: 9 },
+    attributes: {
+      alcohol_percent: 11.5,
+      grape_variety: ['riesling'],
+      organic: false,
+      serving_temp: 9,
+    },
   },
   {
     name: 'Impérial Brut',
@@ -356,7 +404,11 @@ const BEVERAGES: {
     type: 'Mousserende',
     country: 'FR',
     description: 'Grøn æble, citrus og brioche. Husets kendetegn.',
-    attributes: { alcohol_percent: 12, grape_variety: ['chardonnay', 'pinot_noir'], serving_temp: 8 },
+    attributes: {
+      alcohol_percent: 12,
+      grape_variety: ['chardonnay', 'pinot_noir'],
+      serving_temp: 8,
+    },
   },
   {
     name: '12 Year Old',
@@ -417,10 +469,19 @@ const BEVERAGES: {
 ];
 
 const REVIEW_TEXTS = [
-  { title: 'Ramte lige ned i det', body: 'Præcis den balance jeg håbede på. Den holder til hele aftenen.' },
-  { title: 'God, men tung', body: 'Fantastisk første indtryk. Efter en halv flaske bliver den lidt meget.' },
+  {
+    title: 'Ramte lige ned i det',
+    body: 'Præcis den balance jeg håbede på. Den holder til hele aftenen.',
+  },
+  {
+    title: 'God, men tung',
+    body: 'Fantastisk første indtryk. Efter en halv flaske bliver den lidt meget.',
+  },
   { title: 'Bedre end forventet', body: 'Havde skrevet den af på forhånd. Det var forkert.' },
-  { title: 'Solid hverdagsflaske', body: 'Ikke noget der overrasker, men heller aldrig skuffende.' },
+  {
+    title: 'Solid hverdagsflaske',
+    body: 'Ikke noget der overrasker, men heller aldrig skuffende.',
+  },
   { title: 'Lidt for sød for mig', body: 'Godt håndværk, men sødmen tager over til sidst.' },
   { title: 'Den kommer i skabet igen', body: 'Købte to mere dagen efter. Siger vist alt.' },
 ];
@@ -444,8 +505,18 @@ async function main(): Promise<void> {
   console.log('Seeder database …');
 
   // ---- Brugere ----
-  const admin = await upsertUser('admin@maanslogen.dk', 'Mathias F.', 'ADMIN', 'Maanslogen-Admin-1');
-  const moderator = await upsertUser('mod@maanslogen.dk', 'Signe K.', 'MODERATOR', 'Maanslogen-Mod-1');
+  const admin = await upsertUser(
+    'admin@maanslogen.dk',
+    'Mathias F.',
+    'ADMIN',
+    'Maanslogen-Admin-1',
+  );
+  const moderator = await upsertUser(
+    'mod@maanslogen.dk',
+    'Signe K.',
+    'MODERATOR',
+    'Maanslogen-Mod-1',
+  );
   const reviewers = await Promise.all([
     upsertUser('jonas@example.dk', 'Jonas P.', 'USER', 'Maanslogen-Test-1'),
     upsertUser('frida@example.dk', 'Frida L.', 'USER', 'Maanslogen-Test-1'),
@@ -461,7 +532,11 @@ async function main(): Promise<void> {
     const row = await prisma.beverageCategory.upsert({
       where: { slug: slugify(category.name) },
       create: { ...category, slug: slugify(category.name) },
-      update: { icon: category.icon, accentColor: category.accentColor, sortOrder: category.sortOrder },
+      update: {
+        icon: category.icon,
+        accentColor: category.accentColor,
+        sortOrder: category.sortOrder,
+      },
       select: { id: true },
     });
     categoryByName.set(category.name, row.id);
@@ -475,7 +550,13 @@ async function main(): Promise<void> {
       const slug = slugify(`${categoryName} ${type.name}`);
       const row = await prisma.beverageType.upsert({
         where: { slug },
-        create: { slug, categoryId, name: type.name, description: type.description, sortOrder: index * 10 },
+        create: {
+          slug,
+          categoryId,
+          name: type.name,
+          description: type.description,
+          sortOrder: index * 10,
+        },
         update: { description: type.description, sortOrder: index * 10 },
         select: { id: true },
       });
@@ -504,7 +585,9 @@ async function main(): Promise<void> {
         sortOrder: attribute.sortOrder,
         rules: attribute.rules,
         options: attribute.options,
-        ...(categoryIds.length ? { categories: { connect: categoryIds.map((id) => ({ id })) } } : {}),
+        ...(categoryIds.length
+          ? { categories: { connect: categoryIds.map((id) => ({ id })) } }
+          : {}),
       },
       update: {
         displayName: attribute.displayName,
@@ -550,7 +633,9 @@ async function main(): Promise<void> {
       await prisma.question.create({
         data: {
           ...data,
-          ...(categoryIds.length ? { categories: { connect: categoryIds.map((id) => ({ id })) } } : {}),
+          ...(categoryIds.length
+            ? { categories: { connect: categoryIds.map((id) => ({ id })) } }
+            : {}),
         },
       });
     }
@@ -573,7 +658,10 @@ async function main(): Promise<void> {
         countryCode: brand.country,
         categories: { connect: categoryIds.map((id) => ({ id })) },
       },
-      update: { countryCode: brand.country, categories: { set: categoryIds.map((id) => ({ id })) } },
+      update: {
+        countryCode: brand.country,
+        categories: { set: categoryIds.map((id) => ({ id })) },
+      },
       select: { id: true },
     });
     brandByName.set(brand.name, row.id);
@@ -587,7 +675,9 @@ async function main(): Promise<void> {
     const typeId = typeByName.get(beverage.type);
     if (!brandId || !typeId) continue;
 
-    const slug = slugify([beverage.brand, beverage.name, beverage.vintage].filter(Boolean).join(' '));
+    const slug = slugify(
+      [beverage.brand, beverage.name, beverage.vintage].filter(Boolean).join(' '),
+    );
     const row = await prisma.beverage.upsert({
       where: { slug },
       create: {
@@ -701,7 +791,9 @@ async function main(): Promise<void> {
           title: text?.title ?? null,
           body: text?.body ?? null,
           answers: {
-            create: answers.filter((answer): answer is NonNullable<typeof answer> => answer !== null),
+            create: answers.filter(
+              (answer): answer is NonNullable<typeof answer> => answer !== null,
+            ),
           },
         },
       });

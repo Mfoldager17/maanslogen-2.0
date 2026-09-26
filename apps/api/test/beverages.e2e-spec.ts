@@ -1,5 +1,11 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { registerUser, resetDatabase, startHarness, type AuthedUser, type TestHarness } from './harness';
+import {
+  registerUser,
+  resetDatabase,
+  startHarness,
+  type AuthedUser,
+  type TestHarness,
+} from './harness';
 
 /**
  * Den dynamiske attributmodel er hele pointen med systemet, så den testes
@@ -46,9 +52,13 @@ describe('Drikkevarer og dynamiske attributter (e2e)', () => {
     wineCategoryId = (await post('/api/v1/categories', { name: 'Vin', icon: '🍷' })).id;
     stoutTypeId = (await post('/api/v1/types', { categoryId: beerCategoryId, name: 'Stout' })).id;
     ipaTypeId = (await post('/api/v1/types', { categoryId: beerCategoryId, name: 'IPA' })).id;
-    redWineTypeId = (await post('/api/v1/types', { categoryId: wineCategoryId, name: 'Rødvin' })).id;
-    brandId = (await post('/api/v1/brands', { name: 'Mikkeller', categoryIds: [beerCategoryId] })).id;
-    wineBrandId = (await post('/api/v1/brands', { name: 'Dr. Loosen', categoryIds: [wineCategoryId] })).id;
+    redWineTypeId = (await post('/api/v1/types', { categoryId: wineCategoryId, name: 'Rødvin' }))
+      .id;
+    brandId = (await post('/api/v1/brands', { name: 'Mikkeller', categoryIds: [beerCategoryId] }))
+      .id;
+    wineBrandId = (
+      await post('/api/v1/brands', { name: 'Dr. Loosen', categoryIds: [wineCategoryId] })
+    ).id;
 
     // Uden kategorier: gælder alle.
     alcoholDefId = (
@@ -111,11 +121,12 @@ describe('Drikkevarer og dynamiske attributter (e2e)', () => {
         method: 'GET',
         url: `/api/v1/attributes/for-type/${stoutTypeId}`,
       });
-      expect(response.json().map((definition: { key: string }) => definition.key).sort()).toEqual([
-        'alcohol_percent',
-        'color',
-        'ibu',
-      ]);
+      expect(
+        response
+          .json()
+          .map((definition: { key: string }) => definition.key)
+          .sort(),
+      ).toEqual(['alcohol_percent', 'color', 'ibu']);
     });
 
     it('udelader den stout-specifikke attribut for IPA', async () => {
@@ -123,10 +134,12 @@ describe('Drikkevarer og dynamiske attributter (e2e)', () => {
         method: 'GET',
         url: `/api/v1/attributes/for-type/${ipaTypeId}`,
       });
-      expect(response.json().map((definition: { key: string }) => definition.key).sort()).toEqual([
-        'alcohol_percent',
-        'ibu',
-      ]);
+      expect(
+        response
+          .json()
+          .map((definition: { key: string }) => definition.key)
+          .sort(),
+      ).toEqual(['alcohol_percent', 'ibu']);
     });
 
     it('giver kun rødvin den ubegrænsede attribut', async () => {
@@ -304,7 +317,8 @@ describe('Drikkevarer og dynamiske attributter (e2e)', () => {
       });
     });
 
-    const names = (body: { items: { name: string }[] }) => body.items.map((item) => item.name).sort();
+    const names = (body: { items: { name: string }[] }) =>
+      body.items.map((item) => item.name).sort();
 
     it('filtrerer på et talinterval', async () => {
       const response = await harness.request({
@@ -357,7 +371,9 @@ describe('Drikkevarer og dynamiske attributter (e2e)', () => {
         url: '/api/v1/beverages/facets?categorySlug=oel',
       });
       const facets = response.json();
-      expect(facets.types.find((bucket: { label: string }) => bucket.label === 'Stout').count).toBe(3);
+      expect(facets.types.find((bucket: { label: string }) => bucket.label === 'Stout').count).toBe(
+        3,
+      );
       expect(facets.countries.map((bucket: { value: string }) => bucket.value).sort()).toEqual([
         'DK',
         'IE',

@@ -1,6 +1,10 @@
 import { Controller, HttpStatus, Post } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { presignRequestSchema, presignResponseSchema, type PresignRequest } from '@maanslogen/contracts';
+import {
+  presignRequestSchema,
+  presignResponseSchema,
+  type PresignRequest,
+} from '@maanslogen/contracts';
 import { MinRole } from '../../common/decorators/roles.decorator';
 import { ZodBody } from '../../common/http/zod.pipe';
 import { ApiProblemResponses, ApiZodBody, ApiZodResponse } from '../../common/openapi/zod-openapi';

@@ -132,7 +132,11 @@ describe('Auth (e2e)', () => {
     expect(change.statusCode).toBe(204);
 
     // tokenVersion er bumpet, så det gamle access-token er værdiløst.
-    const me = await harness.request({ method: 'GET', url: '/api/v1/auth/me', headers: user.headers });
+    const me = await harness.request({
+      method: 'GET',
+      url: '/api/v1/auth/me',
+      headers: user.headers,
+    });
     expect(me.statusCode).toBe(401);
 
     const login = await harness.request({

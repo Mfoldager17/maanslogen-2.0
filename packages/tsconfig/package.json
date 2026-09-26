@@ -2,5 +2,15 @@
   "name": "@maanslogen/tsconfig",
   "version": "2.0.0",
   "private": true,
-  "files": ["base.json", "node.json", "nextjs.json"]
+  "files": [
+    "base.json",
+    "node.json",
+    "nextjs.json"
+  ],
+  "scripts": {
+    "typecheck": "echo 'ingen kode'",
+    "lint": "echo 'ingen kode'",
+    "test": "echo 'ingen tests'",
+    "build": "echo 'ingen build'"
+  }
 }

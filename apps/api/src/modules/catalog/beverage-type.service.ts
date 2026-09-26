@@ -94,7 +94,9 @@ export class BeverageTypeService {
     if (input.categoryId) await this.assertCategoryExists(input.categoryId);
 
     const slug =
-      input.slug && input.slug !== existing.slug ? await this.resolveSlug(input.slug, id) : undefined;
+      input.slug && input.slug !== existing.slug
+        ? await this.resolveSlug(input.slug, id)
+        : undefined;
 
     const row = await this.prisma.beverageType.update({
       where: { id },

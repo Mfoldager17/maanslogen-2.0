@@ -130,12 +130,14 @@ export class AttributeService {
         filterable: input.filterable ?? false,
         highlighted: input.highlighted ?? false,
         sortOrder: input.sortOrder ?? 0,
-        rules: (input.rules ?? undefined),
-        options: (input.options ?? undefined),
+        rules: input.rules ?? undefined,
+        options: input.options ?? undefined,
         ...(input.categoryIds?.length
           ? { categories: { connect: input.categoryIds.map((id) => ({ id })) } }
           : {}),
-        ...(input.typeIds?.length ? { types: { connect: input.typeIds.map((id) => ({ id })) } } : {}),
+        ...(input.typeIds?.length
+          ? { types: { connect: input.typeIds.map((id) => ({ id })) } }
+          : {}),
       },
       include: INCLUDE,
     });

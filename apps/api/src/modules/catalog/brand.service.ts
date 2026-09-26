@@ -75,7 +75,9 @@ export class BrandService {
     const slug = await this.resolveSlug(input.slug ?? input.name);
 
     const row = await this.prisma.$transaction(async (tx) => {
-      const mediaId = input.media ? await this.media.createAsset(tx, 'BRAND', input.media) : undefined;
+      const mediaId = input.media
+        ? await this.media.createAsset(tx, 'BRAND', input.media)
+        : undefined;
       return tx.brand.create({
         data: {
           slug,
@@ -102,7 +104,9 @@ export class BrandService {
     await this.assertCategoriesExist(input.categoryIds);
 
     const slug =
-      input.slug && input.slug !== existing.slug ? await this.resolveSlug(input.slug, id) : undefined;
+      input.slug && input.slug !== existing.slug
+        ? await this.resolveSlug(input.slug, id)
+        : undefined;
 
     const row = await this.prisma.$transaction(async (tx) => {
       let mediaId: string | null | undefined;

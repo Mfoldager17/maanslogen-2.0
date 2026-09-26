@@ -1,5 +1,11 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { registerUser, resetDatabase, startHarness, type AuthedUser, type TestHarness } from './harness';
+import {
+  registerUser,
+  resetDatabase,
+  startHarness,
+  type AuthedUser,
+  type TestHarness,
+} from './harness';
 
 describe('Anmeldelser (e2e)', () => {
   let harness: TestHarness;
@@ -161,7 +167,9 @@ describe('Anmeldelser (e2e)', () => {
         ],
       });
       expect(response.statusCode).toBe(422);
-      expect(response.json().errors[`answers.${bitternessQuestionId}`][0]).toContain('mellem 1 og 5');
+      expect(response.json().errors[`answers.${bitternessQuestionId}`][0]).toContain(
+        'mellem 1 og 5',
+      );
     });
 
     it('afviser ukendte valgmuligheder', async () => {
@@ -186,15 +194,24 @@ describe('Anmeldelser (e2e)', () => {
     });
 
     it('tillader kun én anmeldelse pr. bruger pr. drikkevare', async () => {
-      expect((await postReview(alice, { rating: 4, answers: validAnswers() })).statusCode).toBe(201);
+      expect((await postReview(alice, { rating: 4, answers: validAnswers() })).statusCode).toBe(
+        201,
+      );
       const duplicate = await postReview(alice, { rating: 5, answers: validAnswers() });
       expect(duplicate.statusCode).toBe(409);
     });
   });
 
   describe('bedømmelsen genberegnes', () => {
-    async function ratingOf(): Promise<{ average: number; count: number; distribution: Record<string, number> }> {
-      const response = await harness.request({ method: 'GET', url: `/api/v1/beverages/${beverageSlug}` });
+    async function ratingOf(): Promise<{
+      average: number;
+      count: number;
+      distribution: Record<string, number>;
+    }> {
+      const response = await harness.request({
+        method: 'GET',
+        url: `/api/v1/beverages/${beverageSlug}`,
+      });
       return response.json().rating;
     }
 
@@ -240,7 +257,10 @@ describe('Anmeldelser (e2e)', () => {
       await postReview(alice, { rating: 4.5, answers: validAnswers() });
       await postReview(bob, { rating: 3.5, answers: validAnswers() });
 
-      const rows = await harness.prisma.review.findMany({ where: { beverageId }, select: { rating: true } });
+      const rows = await harness.prisma.review.findMany({
+        where: { beverageId },
+        select: { rating: true },
+      });
       const expected = rows.reduce((sum, row) => sum + row.rating, 0) / rows.length;
       const stored = await harness.prisma.beverage.findUniqueOrThrow({
         where: { id: beverageId },
@@ -281,7 +301,10 @@ describe('Anmeldelser (e2e)', () => {
       const review = (
         await postReview(alice, {
           rating: 4,
-          answers: [...validAnswers(), { questionId: aromaQuestionId, value: ['coffee', 'caramel'] }],
+          answers: [
+            ...validAnswers(),
+            { questionId: aromaQuestionId, value: ['coffee', 'caramel'] },
+          ],
         })
       ).json();
 

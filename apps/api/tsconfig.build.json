@@ -9,9 +9,7 @@
     "**/*.test.ts",
     "*.config.ts"
   ],
-  "include": [
-    "src/**/*.ts"
-  ],
+  "include": ["src/**/*.ts"],
   "compilerOptions": {
     "rootDir": "./src"
   }

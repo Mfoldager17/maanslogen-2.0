@@ -18,7 +18,9 @@ export class AppError extends HttpException {
       type: ProblemType.NotFound,
       title: 'Ikke fundet',
       status: HttpStatus.NOT_FOUND,
-      detail: identifier ? `${resource} med id "${identifier}" findes ikke` : `${resource} findes ikke`,
+      detail: identifier
+        ? `${resource} med id "${identifier}" findes ikke`
+        : `${resource} findes ikke`,
     });
   }
 

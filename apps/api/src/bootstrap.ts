@@ -62,7 +62,9 @@ export async function createApp(): Promise<NestFastifyApplication> {
   return app;
 }
 
-export function setupOpenApi(app: NestFastifyApplication): ReturnType<typeof SwaggerModule.createDocument> {
+export function setupOpenApi(
+  app: NestFastifyApplication,
+): ReturnType<typeof SwaggerModule.createDocument> {
   const documentConfig = new DocumentBuilder()
     .setTitle('Maanslogen API')
     .setDescription(

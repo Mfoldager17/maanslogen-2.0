@@ -4,6 +4,7 @@
   "private": true,
   "description": "Maanslogen 2.0 API \u2014 NestJS, Fastify, Prisma, PostgreSQL",
   "scripts": {
+    "postinstall": "prisma generate",
     "build": "nest build",
     "dev": "nest start --watch",
     "start": "node dist/main.js",

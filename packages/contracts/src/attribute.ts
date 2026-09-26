@@ -102,7 +102,11 @@ export const createAttributeDefinitionSchema = z
     }
     if (value.rules?.min !== undefined && value.rules.max !== undefined) {
       if (value.rules.min > value.rules.max) {
-        ctx.addIssue({ code: 'custom', path: ['rules', 'min'], message: 'min må ikke være større end max' });
+        ctx.addIssue({
+          code: 'custom',
+          path: ['rules', 'min'],
+          message: 'min må ikke være større end max',
+        });
       }
     }
   })
@@ -202,10 +206,13 @@ export function validateAttributeValue(
     case 'ENUM': {
       if (typeof value !== 'string') return `${definition.displayName} skal være én valgmulighed`;
       const allowed = options?.map((option) => option.value) ?? [];
-      return allowed.includes(value) ? null : `"${value}" er ikke en gyldig værdi for ${definition.displayName}`;
+      return allowed.includes(value)
+        ? null
+        : `"${value}" er ikke en gyldig værdi for ${definition.displayName}`;
     }
     case 'MULTI_ENUM': {
-      if (!Array.isArray(value)) return `${definition.displayName} skal være en liste af valgmuligheder`;
+      if (!Array.isArray(value))
+        return `${definition.displayName} skal være en liste af valgmuligheder`;
       const allowed = new Set(options?.map((option) => option.value) ?? []);
       const invalid = value.filter((entry) => !allowed.has(entry));
       return invalid.length === 0

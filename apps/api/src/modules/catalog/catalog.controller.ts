@@ -133,7 +133,10 @@ export class BeverageTypeController {
   @ApiZodBody(updateBeverageTypeSchema)
   @ApiZodResponse(HttpStatus.OK, beverageTypeSchema)
   @ApiProblemResponses(401, 403, 404, 422)
-  update(@Param('id') id: string, @ZodBody(updateBeverageTypeSchema) body: UpdateBeverageTypeInput) {
+  update(
+    @Param('id') id: string,
+    @ZodBody(updateBeverageTypeSchema) body: UpdateBeverageTypeInput,
+  ) {
     return this.types.update(id, body);
   }
 

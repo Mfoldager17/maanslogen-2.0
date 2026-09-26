@@ -1,0 +1,312 @@
+@import "tailwindcss";
+
+/* ==========================================================================
+   Designtokens
+   Alt farve, radius og skygge lever som CSS-variabler. Mørkt tema skifter kun
+   værdierne — ingen komponent kender til temaer, og der findes ingen
+   `dark:`-klasser spredt ud i markup'en.
+   ========================================================================== */
+
+@theme {
+  --font-sans: var(--font-public-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-fraunces), Georgia, "Times New Roman", serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, monospace;
+
+  --color-canvas: var(--canvas);
+  --color-surface: var(--surface);
+  --color-sunken: var(--sunken);
+  --color-ink: var(--ink);
+  --color-ink-soft: var(--ink-soft);
+  --color-ink-muted: var(--ink-muted);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-line: var(--accent-line);
+  --color-on-accent: var(--on-accent);
+
+  --color-positive: var(--positive);
+  --color-positive-soft: var(--positive-soft);
+  --color-positive-ink: var(--positive-ink);
+
+  --color-warning-soft: var(--warning-soft);
+  --color-warning-ink: var(--warning-ink);
+
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-danger-line: var(--danger-line);
+
+  --color-star: var(--star);
+  --color-star-empty: var(--star-empty);
+
+  --radius-card: 1rem;
+  --radius-control: 0.6875rem;
+
+  --shadow-raise: 0 1px 2px rgb(28 25 23 / 0.04), 0 8px 24px -12px rgb(28 25 23 / 0.14);
+  --shadow-pop: 0 4px 12px rgb(28 25 23 / 0.08), 0 24px 48px -24px rgb(28 25 23 / 0.28);
+}
+
+:root {
+  color-scheme: light;
+
+  --canvas: #fbf8f3;
+  --surface: #ffffff;
+  --sunken: #f4efe7;
+  --ink: #1c1917;
+  --ink-soft: #55504a;
+  --ink-muted: #6b625a;
+  --line: #e7e0d6;
+  --line-strong: #d8cfc2;
+
+  --accent: #a8492a;
+  --accent-hover: #7d3520;
+  --accent-soft: #f7e9e2;
+  --accent-line: #ddb9a8;
+  --on-accent: #ffffff;
+
+  --positive: #2e5e4e;
+  --positive-soft: #e3efe6;
+  --positive-ink: #24503f;
+
+  --warning-soft: #f7efdc;
+  --warning-ink: #7a5a12;
+
+  --danger: #a5322c;
+  --danger-soft: #f9e7e5;
+  --danger-line: #edc9c5;
+
+  --star: #b0700f;
+  --star-empty: #ded2c0;
+}
+
+.dark {
+  color-scheme: dark;
+
+  --canvas: #171310;
+  --surface: #211b17;
+  --sunken: #1c1714;
+  --ink: #f5efe7;
+  --ink-soft: #c8bcb0;
+  --ink-muted: #a79a8e;
+  --line: #342b24;
+  --line-strong: #463a31;
+
+  --accent: #e08055;
+  --accent-hover: #ec9670;
+  --accent-soft: #3a251b;
+  --accent-line: #5c3a29;
+  --on-accent: #1c1917;
+
+  --positive: #68a88e;
+  --positive-soft: #1e322a;
+  --positive-ink: #9bcfb6;
+
+  --warning-soft: #33280f;
+  --warning-ink: #e3c476;
+
+  --danger: #e87c74;
+  --danger-soft: #3a1f1d;
+  --danger-line: #5c302c;
+
+  --star: #e0a94a;
+  --star-empty: #3a322a;
+}
+
+@layer base {
+  * {
+    border-color: var(--line);
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    background: var(--canvas);
+    color: var(--ink);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* Synligt fokus — men kun for tastatur, så museklik ikke efterlader ringe. */
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  ::selection {
+    background: var(--accent-soft);
+    color: var(--accent-hover);
+  }
+
+  /* Tal i tabeller og bedømmelser skal stå i kolonne. */
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+/* ==========================================================================
+   Bevægelse
+   Alt herunder er pynt. Hver eneste animation er slået fra for folk der har
+   bedt om mindre bevægelse — og layoutet må ikke afhænge af nogen af dem.
+   ========================================================================== */
+
+@keyframes mlg-pour {
+  0% {
+    transform: translateY(100%);
+  }
+  60% {
+    transform: translateY(6%);
+  }
+  75% {
+    transform: translateY(12%);
+  }
+  100% {
+    transform: translateY(8%);
+  }
+}
+
+@keyframes mlg-surface-wobble {
+  0%,
+  100% {
+    transform: translateX(-50%) rotate(-2.5deg) scaleY(1);
+  }
+  50% {
+    transform: translateX(-50%) rotate(2.5deg) scaleY(0.85);
+  }
+}
+
+@keyframes mlg-bubble {
+  0% {
+    transform: translateY(0) scale(0.6);
+    opacity: 0;
+  }
+  20% {
+    opacity: 0.9;
+  }
+  100% {
+    transform: translateY(-160%) scale(1.15);
+    opacity: 0;
+  }
+}
+
+@keyframes mlg-fizz {
+  0% {
+    transform: translate(0, 0) scale(0.4);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(var(--fizz-x, 0), var(--fizz-y, -28px)) scale(1);
+    opacity: 0;
+  }
+}
+
+@keyframes mlg-clink-left {
+  0%,
+  100% {
+    transform: rotate(-14deg) translateX(0);
+  }
+  45% {
+    transform: rotate(6deg) translateX(20%);
+  }
+  55% {
+    transform: rotate(4deg) translateX(16%);
+  }
+}
+
+@keyframes mlg-clink-right {
+  0%,
+  100% {
+    transform: rotate(14deg) translateX(0);
+  }
+  45% {
+    transform: rotate(-6deg) translateX(-20%);
+  }
+  55% {
+    transform: rotate(-4deg) translateX(-16%);
+  }
+}
+
+@keyframes mlg-spark {
+  0% {
+    transform: scale(0.2);
+    opacity: 0;
+  }
+  35% {
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1.6);
+    opacity: 0;
+  }
+}
+
+@keyframes mlg-tilt-sip {
+  0%,
+  70%,
+  100% {
+    transform: rotate(0deg);
+  }
+  20%,
+  50% {
+    transform: rotate(-26deg);
+  }
+}
+
+@keyframes mlg-shimmer {
+  0% {
+    background-position: -120% 0;
+  }
+  100% {
+    background-position: 220% 0;
+  }
+}
+
+@keyframes mlg-rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@utility animate-pour {
+  animation: mlg-pour 1.4s cubic-bezier(0.34, 1.2, 0.64, 1) forwards;
+}
+
+@utility animate-rise-in {
+  animation: mlg-rise-in 0.4s ease-out both;
+}
+
+/* Skeletter med et strejf af glas — ikke bare en grå kasse. */
+@utility skeleton {
+  background-image: linear-gradient(
+    100deg,
+    var(--sunken) 30%,
+    color-mix(in oklab, var(--sunken) 60%, var(--surface)) 50%,
+    var(--sunken) 70%
+  );
+  background-size: 220% 100%;
+  animation: mlg-shimmer 1.6s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}

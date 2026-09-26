@@ -107,7 +107,9 @@ export class CategoryService {
     if (!existing) throw AppError.notFound('Kategori', id);
 
     const slug =
-      input.slug && input.slug !== existing.slug ? await this.resolveSlug(input.slug, id) : undefined;
+      input.slug && input.slug !== existing.slug
+        ? await this.resolveSlug(input.slug, id)
+        : undefined;
 
     const updated = await this.prisma.$transaction(async (tx) => {
       let mediaId: string | null | undefined;

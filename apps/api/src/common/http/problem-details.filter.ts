@@ -59,9 +59,9 @@ export class ProblemDetailsFilter implements ExceptionFilter {
         typeof response === 'string'
           ? response
           : typeof response === 'object' && response !== null && 'message' in response
-            ? Array.isArray((response).message)
+            ? Array.isArray(response.message)
               ? ((response as { message: string[] }).message ?? []).join(', ')
-              : String((response).message)
+              : String(response.message)
             : exception.message;
 
       return {

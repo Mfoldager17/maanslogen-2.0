@@ -29,9 +29,7 @@ describe('loadConfig', () => {
   });
 
   it('kræver R2-nøgler når STORAGE_DRIVER=r2', () => {
-    expect(() =>
-      loadConfig({ ...BASE, STORAGE_DRIVER: 'r2' }),
-    ).toThrowError(/R2_ACCOUNT_ID/);
+    expect(() => loadConfig({ ...BASE, STORAGE_DRIVER: 'r2' })).toThrowError(/R2_ACCOUNT_ID/);
   });
 
   it('accepterer en fuld R2-konfiguration', () => {
@@ -48,9 +46,7 @@ describe('loadConfig', () => {
   });
 
   it('afviser korte JWT-hemmeligheder', () => {
-    expect(() =>
-      loadConfig({ ...BASE, JWT_ACCESS_SECRET: 'kort' }),
-    ).toThrowError(/mindst 32 tegn/);
+    expect(() => loadConfig({ ...BASE, JWT_ACCESS_SECRET: 'kort' })).toThrowError(/mindst 32 tegn/);
   });
 
   it('afviser udviklingshemmeligheder i produktion', () => {
@@ -65,14 +61,10 @@ describe('loadConfig', () => {
   });
 
   it('kræver eksplicit CORS i produktion', () => {
-    expect(() =>
-      loadConfig({ ...BASE, NODE_ENV: 'production' }),
-    ).toThrowError(/CORS_ORIGINS/);
+    expect(() => loadConfig({ ...BASE, NODE_ENV: 'production' })).toThrowError(/CORS_ORIGINS/);
   });
 
   it('afviser ugyldige varigheder', () => {
-    expect(() =>
-      loadConfig({ ...BASE, ACCESS_TOKEN_TTL: '15 minutter' }),
-    ).toThrowError(/Varighed/);
+    expect(() => loadConfig({ ...BASE, ACCESS_TOKEN_TTL: '15 minutter' })).toThrowError(/Varighed/);
   });
 });

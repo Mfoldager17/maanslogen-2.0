@@ -6,6 +6,7 @@ import {
   reviewFormSchema,
   reviewListQuerySchema,
   reviewSchema,
+  tasteProfileSchema,
   updateReviewSchema,
   type AccessTokenClaims,
   type CreateReviewInput,
@@ -17,11 +18,15 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { ZodBody, ZodQuery } from '../../common/http/zod.pipe';
 import { ApiProblemResponses, ApiZodBody, ApiZodResponse } from '../../common/openapi/zod-openapi';
 import { ReviewService } from './review.service';
+import { TasteProfileService } from './taste-profile.service';
 
 @ApiTags('Anmeldelser')
 @Controller('reviews')
 export class ReviewController {
-  constructor(private readonly reviews: ReviewService) {}
+  constructor(
+    private readonly reviews: ReviewService,
+    private readonly tasteProfiles: TasteProfileService,
+  ) {}
 
   @Public()
   @Get()
@@ -48,6 +53,19 @@ export class ReviewController {
   }
 
   @Public()
+  @Get('profile/:beverageIdOrSlug')
+  @ApiOperation({
+    summary: 'Smagsprofil — anmeldelsernes svar sammenfattet',
+    description:
+      'Skalaspørgsmål bliver til gennemsnit, ja/nej til andele og valg til fordelinger. Muligt fordi svarene gemmes typet frem for som fritekst.',
+  })
+  @ApiZodResponse(HttpStatus.OK, tasteProfileSchema)
+  @ApiProblemResponses(404)
+  profile(@Param('beverageIdOrSlug') beverageIdOrSlug: string) {
+    return this.tasteProfiles.forBeverage(beverageIdOrSlug);
+  }
+
+  @Public()
   @Get(':id')
   @ApiOperation({ summary: 'Hent én anmeldelse' })
   @ApiZodResponse(HttpStatus.OK, reviewSchema)
@@ -62,10 +80,7 @@ export class ReviewController {
   @ApiZodBody(createReviewSchema)
   @ApiZodResponse(HttpStatus.CREATED, reviewSchema)
   @ApiProblemResponses(401, 404, 409, 422)
-  create(
-    @CurrentUser('sub') userId: string,
-    @ZodBody(createReviewSchema) body: CreateReviewInput,
-  ) {
+  create(@CurrentUser('sub') userId: string, @ZodBody(createReviewSchema) body: CreateReviewInput) {
     return this.reviews.create(userId, body);
   }
 

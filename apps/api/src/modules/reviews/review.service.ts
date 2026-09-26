@@ -176,9 +176,7 @@ export class ReviewService {
           ...(input.rating === undefined ? {} : { rating: input.rating }),
           ...(input.title === undefined ? {} : { title: input.title ?? null }),
           ...(input.body === undefined ? {} : { body: input.body ?? null }),
-          ...(answerRows === null
-            ? {}
-            : { answers: { deleteMany: {}, create: answerRows } }),
+          ...(answerRows === null ? {} : { answers: { deleteMany: {}, create: answerRows } }),
         },
       });
 
@@ -271,7 +269,8 @@ export class ReviewService {
           value === null ||
           value === '' ||
           (Array.isArray(value) && value.length === 0);
-        if (isEmpty) (errors[`answers.${question.id}`] ??= []).push(`"${question.prompt}" skal besvares`);
+        if (isEmpty)
+          (errors[`answers.${question.id}`] ??= []).push(`"${question.prompt}" skal besvares`);
       }
     }
 
