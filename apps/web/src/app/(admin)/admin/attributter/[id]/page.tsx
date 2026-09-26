@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import type { AttributeDefinition } from "@maanslogen/contracts";
 import { api } from "@/lib/api/api.server";
+import { alleSider } from "@/lib/api/alle-sider";
 import { serverApiOrNull } from "@/lib/api/server";
 import { AdminPageHeader } from "@/components/admin/page-header";
 import { AttributeBuilder } from "@/components/admin/attribute-builder";
@@ -11,8 +12,8 @@ export default async function EditAttributePage({ params }: { params: Promise<{ 
 
   const [definition, categories, types] = await Promise.all([
     serverApiOrNull<AttributeDefinition>(`/attributes/${id}`),
-    api.categories.list({ limit: 50, sort: "sortOrder" }),
-    api.types.list({ limit: 200, sort: "sortOrder" }),
+    alleSider(api.categories.list, { sort: "sortOrder" }),
+    alleSider(api.types.list, { sort: "sortOrder" }),
   ]);
   if (!definition) notFound();
 
@@ -27,7 +28,7 @@ export default async function EditAttributePage({ params }: { params: Promise<{ 
         ]}
         actions={<DeleteAttributeAction id={definition.id} label={definition.displayName} />}
       />
-      <AttributeBuilder definition={definition} categories={categories.items} types={types.items} />
+      <AttributeBuilder definition={definition} categories={categories} types={types} />
     </>
   );
 }

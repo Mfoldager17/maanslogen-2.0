@@ -1,16 +1,18 @@
 import { api } from "@/lib/api/api.server";
+import { alleSider } from "@/lib/api/alle-sider";
 import { AdminPageHeader } from "@/components/admin/page-header";
 import { BeverageForm } from "@/components/admin/beverage-form";
 import { EmptyState } from "@/components/ui/empty-state";
 
 export default async function NewBeveragePage() {
+  // Dropdowns skal vise alt — ellers kan man ikke vælge det man leder efter.
   const [categories, types, brands] = await Promise.all([
-    api.categories.list({ limit: 100, sort: "sortOrder", active: true }),
-    api.types.list({ limit: 300, sort: "sortOrder", active: true }),
-    api.brands.list({ limit: 300, sort: "name", active: true }),
+    alleSider(api.categories.list, { sort: "sortOrder", active: true }),
+    alleSider(api.types.list, { sort: "sortOrder", active: true }),
+    alleSider(api.brands.list, { sort: "name", active: true }),
   ]);
 
-  const ready = categories.items.length > 0 && types.items.length > 0 && brands.items.length > 0;
+  const ready = categories.length > 0 && types.length > 0 && brands.length > 0;
 
   return (
     <>
@@ -23,12 +25,7 @@ export default async function NewBeveragePage() {
         ]}
       />
       {ready ? (
-        <BeverageForm
-          beverage={null}
-          categories={categories.items}
-          types={types.items}
-          brands={brands.items}
-        />
+        <BeverageForm beverage={null} categories={categories} types={types} brands={brands} />
       ) : (
         <EmptyState
           title="Kataloget mangler grunddata"
