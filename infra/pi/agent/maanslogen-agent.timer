@@ -1,13 +1,22 @@
 [Unit]
-Description=Kør maanslogen-agent hvert andet minut
+Description=Kør maanslogen-agent hvert femte minut
 
 [Timer]
 OnBootSec=2min
-# Hvert andet minut. Uden et GITHUB_TOKEN er GitHubs grænse 60 kald i timen
-# pr. IP-adresse, og agenten bruger ét kald pr. gang — altså 30 i timen.
-# Med et skrivebeskyttet token er grænsen 5.000, og intervallet kan sænkes.
-OnUnitActiveSec=2min
-AccuracySec=10s
+
+# Hvert femte minut, og det er valgt ud fra GitHubs grænse.
+#
+# Uden et token er grænsen 60 API-kald i timen PR. IP-ADRESSE — altså delt med
+# alt andet på dit netværk, også din egen maskine. Ved to minutter brugte
+# agenten alene 30 af dem, altså halvdelen. Ved fem minutter er det 12.
+#
+# Har du sat et skrivebeskyttet GITHUB_TOKEN i /etc/maanslogen/pi.env, er
+# grænsen 5.000 i timen, og så kan du roligt gå ned til 1min.
+#
+# Venter du på en udrulning, så behøver du ikke vente på timeren:
+#   sudo systemctl start maanslogen-agent
+OnUnitActiveSec=5min
+AccuracySec=30s
 
 [Install]
 WantedBy=timers.target

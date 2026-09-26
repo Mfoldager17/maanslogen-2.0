@@ -14,7 +14,7 @@ ubuntu-24.04-arm                Workers (web)          Postgres
   · :main                         Tunnel ─► Caddy ─►     api-dev    (main)
   · :pr-42                                               api-pr-42  (preview)
        │                                                      ▲
-       │   Pi'en spørger hvert andet minut:                   │
+       │   Pi'en spørger hvert femte minut:                   │
        │     · hvilke åbne PR'er har label "preview"?          │
        │     · er der et nyt :main-image?                      │
        └───────────────────────────────────────────►  maanslogen-agent
@@ -317,7 +317,7 @@ curl -s https://maanslogen.dk -o /dev/null -w '%{http_code}\n'
    arm64, og gratis på et offentligt repo — og lægger det i GHCR som
    `:pr-<n>`. Samtidig bygges web'en og lægges op som en Worker-version med
    aliaset `pr-<n>`, og DNS-navnet oprettes.
-4. Inden for to minutter ser agenten på Pi'en, at PR'et står på listen. Den
+4. Inden for fem minutter ser agenten på Pi'en, at PR'et står på listen. Den
    henter imaget, migrerer dev-databasen og starter
    `maanslogen-api-pr-<n>`. Caddy genkender `api-pr-<n>.` i Host-headeren og
    sender videre — hverken tunnel eller Caddy skal røres.
@@ -482,7 +482,7 @@ Rammer du GitHubs grænse på 60 kald i timen (uautentificeret), står det i
 loggen — sæt et skrivebeskyttet `GITHUB_TOKEN` i `/etc/maanslogen/pi.env`.
 
 **Udrulningen til produktion sker ikke.** Agenten opdager et nyt `:main`-image
-inden for to minutter. Kom der et image op? Se _Actions_ og _Packages_. Ellers
+inden for fem minutter. Kom der et image op? Se _Actions_ og _Packages_. Ellers
 `journalctl -u maanslogen-agent`.
 
 **Web'en viser data, men indlogning fejler.** `CORS_ORIGINS` på API'et skal

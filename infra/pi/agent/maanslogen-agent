@@ -124,14 +124,15 @@ stop_preview() {
 
 # ---- Produktion og det delte dev-API ------------------------------------
 # Følger :main. Er der lagt et nyt image op, migreres og genstartes der.
+# Imaget hentes af kalderen og gives videre som $6. Før hentede hver tjeneste
+# sit eget, men de bruger det samme :main — så det var to identiske kald til
+# GHCR hver eneste gang, altså 60 i timen der ikke udrettede noget.
 opdater_tjeneste() {
-  local tjeneste=$1 netvaerk=$2 database=$3 bruger=$4 kode=$5
+  local tjeneste=$1 netvaerk=$2 database=$3 bruger=$4 kode=$5 ny=$6
   local image="${GHCR_IMAGE}:main"
 
-  local koerende ny
+  local koerende
   koerende=$(docker inspect --format '{{.Image}}' "maanslogen-${tjeneste}" 2>/dev/null || echo ingen)
-  docker pull -q "$image" >/dev/null
-  ny=$(docker inspect --format '{{.Id}}' "$image")
 
   [ "$koerende" = "$ny" ] && return 0
 
@@ -159,8 +160,13 @@ main() {
     printf '%s\n' "${oenskede[@]}" | grep -qx "$pr" || stop_preview "$pr"
   done
 
-  opdater_tjeneste api     maanslogen     maanslogen     "$POSTGRES_USER" "$POSTGRES_PASSWORD"
-  opdater_tjeneste api-dev maanslogen-dev maanslogen_dev maanslogen_dev   "$DEV_POSTGRES_PASSWORD"
+  # Ét kald til GHCR, ikke ét pr. tjeneste. Begge kører det samme :main-image.
+  docker pull -q "${GHCR_IMAGE}:main" >/dev/null
+  local hovedimage
+  hovedimage=$(docker inspect --format '{{.Id}}' "${GHCR_IMAGE}:main")
+
+  opdater_tjeneste api     maanslogen     maanslogen     "$POSTGRES_USER" "$POSTGRES_PASSWORD" "$hovedimage"
+  opdater_tjeneste api-dev maanslogen-dev maanslogen_dev maanslogen_dev   "$DEV_POSTGRES_PASSWORD" "$hovedimage"
 }
 
 # Kun når scriptet køres direkte. Så kan en test source det og kalde de
