@@ -1,0 +1,45 @@
+# Caddy står bag Cloudflare Tunnel og skal hverken skaffe certifikater eller
+# lytte på 443 — tunnelen afslutter TLS. Derfor ren HTTP på 8080.
+{
+	auto_https off
+	admin off
+}
+
+:8080 {
+	log {
+		output stdout
+		format console
+	}
+
+	# Produktion.
+	@prod host {$PROD_API_HOST}
+	handle @prod {
+		reverse_proxy api:4000
+	}
+
+	# Det delte dev-API (main-grenens kode mod dev-databasen).
+	@dev host {$DEV_API_HOST}
+	handle @dev {
+		reverse_proxy api-dev:4000
+	}
+
+	# Preview pr. PR: api-pr-42.dev.eksempel.dk -> maanslogen-api-pr-42:4000.
+	#
+	# Nummeret tages ud af værtsnavnet og sættes ind i containernavnet, så en ny
+	# PR hverken kræver en ny regel her eller en genstart af Caddy. Regexp'en
+	# tillader kun cifre; alt andet falder igennem til 404 nedenfor.
+	@preview header_regexp pr Host ^api-pr-(\d+)\.
+	handle @preview {
+		reverse_proxy maanslogen-api-pr-{http.regexp.pr.1}:4000 {
+			# En preview-container der ikke findes (lukket PR, DNS ikke ryddet
+			# op) skal give et klart svar frem for at hænge.
+			fail_duration 5s
+		}
+	}
+
+	# Alt andet: tunnelen sender os hele trafikken, så et ukendt værtsnavn
+	# skal ikke ramme noget.
+	handle {
+		respond "ukendt vært" 404
+	}
+}

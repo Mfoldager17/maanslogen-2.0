@@ -1,0 +1,33 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "maanslogen-web",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2026-09-25",
+  // nodejs_compat kræves af adapteren. global_fetch_strictly_public får fetch()
+  // mod vores eget domæne til at gå ud på det offentlige net i stedet for at
+  // loope tilbage i Workeren — API'et ligger på et andet domæne, så det er det
+  // vi vil have.
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+  "observability": { "enabled": true }
+
+  // Her står bevidst ingen `vars` med NEXT_PUBLIC_API_URL.
+  //
+  // Next inliner alt med NEXT_PUBLIC_-præfiks ved build — også i serverkoden —
+  // så en variabel sat her ville blive skygget af den værdi der allerede står i
+  // bundlen. Kontrolleret: en bundle bygget mod 127.0.0.1:4600 indeholder den
+  // URL 18 steder, og værdien fra `vars` nul steder. Havde blokken stået her,
+  // ville man kunne ændre den, deploye, og undre sig over at intet skete.
+  //
+  // API'ets adresse er altså et build-input: `NEXT_PUBLIC_API_URL=... pnpm
+  // cf:build`. Det er også derfor hver preview bygger sin egen bundle.
+  //
+  // Udeladt fra skabelonen af hensyn til R2-forbruget: `r2_buckets`
+  // (NEXT_INC_CACHE_R2_BUCKET), `images` og `services`
+  // (WORKER_SELF_REFERENCE). Alle tre hører til Next's ISR-cache og
+  // billedoptimering, som vi ikke bruger — hver eneste rute i denne app er
+  // dynamisk. Se docs/r2-omkostninger.md.
+}

@@ -1,0 +1,111 @@
+# Alt der kører på Pi'en. Bringes op med:
+#   docker compose --env-file .env up -d
+#
+# Preview-containere til de enkelte PR'er startes ikke herfra — de oprettes af
+# preview.sh og hægtes på det samme netværk.
+
+name: maanslogen
+
+networks:
+  maanslogen:
+    name: maanslogen
+
+volumes:
+  postgres-data:
+  caddy-data:
+
+services:
+  # ---- Database ----------------------------------------------------------
+  # Én instans, to databaser: maanslogen (produktion) og maanslogen_dev
+  # (testdata). Begge oprettes af init-scriptet første gang volumen er tom.
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: maanslogen
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./postgres/init-dev-db.sh:/docker-entrypoint-initdb.d/10-init-dev-db.sh:ro
+    networks: [maanslogen]
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER} -d maanslogen']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    # Databasen er kun nåelig inde på docker-netværket. Ingen port publiceres:
+    # skal du bruge psql udefra, så gå gennem `docker compose exec postgres`.
+
+  # ---- API i produktion --------------------------------------------------
+  api:
+    image: maanslogen-api:latest
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: '4000'
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/maanslogen?schema=public
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
+      CORS_ORIGINS: ${PROD_WEB_ORIGIN}
+      COOKIE_DOMAIN: ${COOKIE_DOMAIN}
+      STORAGE_DRIVER: r2
+      R2_ACCOUNT_ID: ${R2_ACCOUNT_ID}
+      R2_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID}
+      R2_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY}
+      R2_BUCKET: ${R2_BUCKET}
+      R2_PUBLIC_BASE_URL: ${MEDIA_PUBLIC_URL}
+      ENABLE_SWAGGER: 'false'
+    networks: [maanslogen]
+
+  # ---- Delt dev-API ------------------------------------------------------
+  # Kører main-grenens kode mod dev-databasen. Det er den et lokalt `pnpm
+  # dev:remote` peger på. PR-previews får deres egen container ved siden af.
+  api-dev:
+    image: maanslogen-api:dev
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: '4000'
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/maanslogen_dev?schema=public
+      JWT_ACCESS_SECRET: ${DEV_JWT_ACCESS_SECRET}
+      JWT_REFRESH_SECRET: ${DEV_JWT_REFRESH_SECRET}
+      # Previews ligger på skiftende workers.dev-adresser, og en lokal
+      # udvikler kommer fra localhost. Begge skal kunne kalde med cookies.
+      CORS_ORIGINS: ${DEV_CORS_ORIGINS}
+      STORAGE_DRIVER: r2
+      R2_ACCOUNT_ID: ${R2_ACCOUNT_ID}
+      R2_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID}
+      R2_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY}
+      R2_BUCKET: ${R2_DEV_BUCKET}
+      R2_PUBLIC_BASE_URL: ${DEV_MEDIA_PUBLIC_URL}
+      ENABLE_SWAGGER: 'true'
+    networks: [maanslogen]
+
+  # ---- Router ------------------------------------------------------------
+  # Fordeler på Host-headeren. Den findes for preview-containernes skyld:
+  # uden den skulle tunnelens konfiguration skrives om og genstartes for hver
+  # PR. Med den rører hverken tunnel eller DNS-opsætning et PR.
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+    networks: [maanslogen]
+
+  # ---- Tunnel ------------------------------------------------------------
+  # Ingen port åbnes i routeren, og Pi'ens IP-adresse bliver aldrig offentlig.
+  # cloudflared skaber selv forbindelsen ud til Cloudflare.
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN}
+    depends_on: [caddy]
+    networks: [maanslogen]

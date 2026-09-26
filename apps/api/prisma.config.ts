@@ -23,6 +23,10 @@ export default defineConfig({
   ...(databaseUrl ? { datasource: { url: databaseUrl } } : {}),
   migrations: {
     path: path.join('prisma', 'migrations'),
-    seed: 'tsx prisma/seed.ts',
+    // Stien til tsx er relativ og med vilje ikke bare 'tsx'. Prisma spawner
+    // kommandoen med PATH som den er, og node_modules/.bin ligger kun i PATH
+    // når noget køres gennem pnpm. I Docker-imaget kaldes prisma-binæren
+    // direkte, og der fejlede seed'en med `spawn tsx ENOENT`.
+    seed: 'node_modules/.bin/tsx prisma/seed.ts',
   },
 });

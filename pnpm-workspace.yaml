@@ -12,3 +12,4 @@ onlyBuiltDependencies:
   - prisma
   - sharp
   - unrs-resolver
+  - workerd

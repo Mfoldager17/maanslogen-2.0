@@ -1,0 +1,91 @@
+name: Udrul
+
+# Produktion udrulles fra main. Dev-API'et følger med, så det delte
+# dev-miljø og lokal udvikling altid kører den kode der er merget.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-produktion
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  api:
+    name: API på Pi'en
+    runs-on: [self-hosted, maanslogen-pi]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Byg imaget
+        run: |
+          docker build -f apps/api/Dockerfile -t maanslogen-api:${{ github.sha }} .
+          docker tag maanslogen-api:${{ github.sha }} maanslogen-api:latest
+          docker tag maanslogen-api:${{ github.sha }} maanslogen-api:dev
+
+      # Migreringer køres som et selvstændigt trin før den nye version
+      # starter. Fra entrypointet ville flere instanser kapløbe om at migrere.
+      - name: Migrér produktionsdatabasen
+        working-directory: infra/pi
+        run: |
+          set -a; . ./.env; set +a
+          docker run --rm --network maanslogen \
+            -e DATABASE_URL="postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/maanslogen?schema=public" \
+            maanslogen-api:${{ github.sha }} ./node_modules/.bin/prisma migrate deploy
+
+      - name: Migrér dev-databasen
+        working-directory: infra/pi
+        run: |
+          set -a; . ./.env; set +a
+          docker run --rm --network maanslogen \
+            -e DATABASE_URL="postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/maanslogen_dev?schema=public" \
+            maanslogen-api:${{ github.sha }} ./node_modules/.bin/prisma migrate deploy
+
+      - name: Genstart API'erne
+        working-directory: infra/pi
+        run: docker compose --env-file .env up -d --force-recreate api api-dev
+
+      - name: Tjek at de svarer
+        working-directory: infra/pi
+        run: |
+          for tjeneste in api api-dev; do
+            for _ in $(seq 1 30); do
+              if docker compose exec -T "$tjeneste" node -e \
+                  "fetch('http://127.0.0.1:4000/api/v1/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))" 2>/dev/null; then
+                echo "$tjeneste er klar"; break
+              fi
+              sleep 2
+            done
+          done
+
+  web:
+    name: Web på Workers
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @maanslogen/contracts build
+
+      - name: Byg til Workers
+        working-directory: apps/web
+        env:
+          NEXT_PUBLIC_API_URL: https://${{ vars.PROD_API_HOST }}
+          NEXT_PUBLIC_MEDIA_URL: https://${{ vars.PROD_MEDIA_HOST }}
+        run: pnpm cf:build
+
+      - name: Udrul
+        working-directory: apps/web
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: pnpm exec wrangler deploy

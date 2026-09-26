@@ -1,0 +1,11 @@
+# Til reference. Kører tunnelen med et token (som i docker-compose.yml), ligger
+# ingress-reglerne i Cloudflares dashboard, og denne fil bruges ikke.
+#
+# Den ene regel er med vilje: al trafik gives til Caddy, som fordeler på
+# Host-headeren. Ellers skulle tunnelen konfigureres om og genstartes for hver
+# PR der åbnes og lukkes.
+tunnel: maanslogen
+credentials-file: /etc/cloudflared/credentials.json
+
+ingress:
+  - service: http://caddy:8080

@@ -2,7 +2,7 @@
   "name": "maanslogen",
   "version": "2.0.0",
   "private": true,
-  "description": "Maanslogen 2.0 — anmeldelser af drikkevarer med dynamiske attributter og spørgsmål",
+  "description": "Maanslogen 2.0 \u2014 anmeldelser af drikkevarer med dynamiske attributter og sp\u00f8rgsm\u00e5l",
   "packageManager": "pnpm@10.33.0",
   "engines": {
     "node": ">=22"
@@ -10,6 +10,8 @@
   "scripts": {
     "build": "turbo run build",
     "dev": "turbo run dev",
+    "dev:web": "pnpm --filter @maanslogen/web dev",
+    "dev:api": "pnpm --filter @maanslogen/api dev",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
