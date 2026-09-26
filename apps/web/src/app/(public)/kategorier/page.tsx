@@ -63,7 +63,7 @@ export default async function CategoriesPage() {
                     {categoryTypes.map((type) => (
                       <li key={type.id}>
                         <Link
-                          href={`/katalog?categorySlug=${category.slug}&typeIds=${type.id}`}
+                          href={`/katalog?categorySlug=${category.slug}&typeSlugs=${type.slug}`}
                           className="inline-flex h-8 items-center rounded-full border border-line-strong px-3 text-sm text-ink-soft transition-colors hover:border-accent-line hover:bg-accent-soft hover:text-accent-hover"
                         >
                           {type.name}

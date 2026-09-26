@@ -107,8 +107,16 @@ export const beverageListQuerySchema = baseListQuerySchema.extend({
   categorySlug: slugSchema.optional(),
   typeId: idSchema.optional(),
   typeIds: csvQuery(idSchema),
+  /**
+   * Facetterne svarer med slugs, ikke id'er — samme mønster som
+   * `categorySlug`. Uden disse kunne man ikke filtrere på det, facetterne
+   * selv lige havde tilbudt: et flueben i sidebaren sendte `?typeIds=
+   * whisky-skotsk-single-malt` ind i en UUID-validering og fik 400.
+   */
+  typeSlugs: csvQuery(slugSchema),
   brandId: idSchema.optional(),
   brandIds: csvQuery(idSchema),
+  brandSlugs: csvQuery(slugSchema),
   countryCodes: csvQuery(z.string().length(2)),
   minRating: optionalFloat({ min: 0, max: 5 }),
   /** Uden dette viser listen kun aktive drikkevarer. */

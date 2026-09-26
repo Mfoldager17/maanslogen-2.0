@@ -298,6 +298,16 @@ export class BeverageService {
     const brandIds = [...(query.brandId ? [query.brandId] : []), ...(query.brandIds ?? [])];
     const attributeFilters = parseAttributeFilters(query.attr);
 
+    // Ét samlet filter på relationen. Kategori og type-slug peger begge på
+    // `type`, og som separate nøgler i samme objekt overskrev den sidste
+    // den første — `?categoryId=…&categorySlug=…` tabte lydløst det ene
+    // filter. Samlet her AND'es de i stedet, som man ville forvente.
+    const typeWhere: Prisma.BeverageTypeWhereInput = {
+      ...(query.typeSlugs?.length ? { slug: { in: query.typeSlugs } } : {}),
+      ...(query.categoryId ? { categoryId: query.categoryId } : {}),
+      ...(query.categorySlug ? { category: { slug: query.categorySlug } } : {}),
+    };
+
     return {
       deletedAt: null,
       // Standarden er kun aktive: en skjult drikkevare skal ikke dukke op
@@ -305,8 +315,8 @@ export class BeverageService {
       ...(query.includeInactive ? {} : { active: query.active ?? true }),
       ...(typeIds.length ? { typeId: { in: typeIds } } : {}),
       ...(brandIds.length ? { brandId: { in: brandIds } } : {}),
-      ...(query.categoryId ? { type: { categoryId: query.categoryId } } : {}),
-      ...(query.categorySlug ? { type: { category: { slug: query.categorySlug } } } : {}),
+      ...(query.brandSlugs?.length ? { brand: { slug: { in: query.brandSlugs } } } : {}),
+      ...(Object.keys(typeWhere).length ? { type: typeWhere } : {}),
       ...(query.countryCodes?.length
         ? { countryCode: { in: query.countryCodes.map((code) => code.toUpperCase()) } }
         : {}),

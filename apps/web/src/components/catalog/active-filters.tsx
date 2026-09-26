@@ -16,9 +16,12 @@ interface ActiveFilter {
 export function ActiveFilters({
   filterable,
   categoryLabel,
+  typeLabels,
 }: {
   filterable: AttributeDefinition[];
   categoryLabel?: string;
+  /** Slug → navn, så chippen viser "Single malt" og ikke slug'en. */
+  typeLabels?: Record<string, string>;
 }) {
   const router = useRouter();
   const params = useSearchParams();
@@ -32,6 +35,16 @@ export function ActiveFilters({
     chips.push({
       key: "categorySlug",
       label: categoryLabel ?? (params.get("categorySlug") as string),
+    });
+  }
+
+  // Uden denne kunne man filtrere på type og hverken se hvad der var slået
+  // til eller fjerne det igen — hele pointen med rækken her.
+  const types = (params.get("typeSlugs") ?? "").split(",").filter(Boolean);
+  if (types.length) {
+    chips.push({
+      key: "typeSlugs",
+      label: types.map((slug) => typeLabels?.[slug] ?? slug).join(", "),
     });
   }
 

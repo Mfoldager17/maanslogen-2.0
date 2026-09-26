@@ -57,6 +57,28 @@ describe('beverageListQuerySchema', () => {
     expect(parsed.sort).toBe('createdAt');
   });
 
+  it('tager imod de slugs facetterne selv svarer med', () => {
+    // Facetterne returnerer slugs som `bucket.value`, ikke id'er. Da
+    // sidebaren sendte dem videre som `typeIds` — en UUID-liste — svarede
+    // API'et 400 på et filter brugeren lige havde fået tilbudt.
+    const parsed = beverageListQuerySchema.parse({
+      categorySlug: 'whisky',
+      typeSlugs: 'whisky-skotsk-single-malt,whisky-irsk',
+      brandSlugs: 'lagavulin',
+    });
+    expect(parsed.typeSlugs).toEqual(['whisky-skotsk-single-malt', 'whisky-irsk']);
+    expect(parsed.brandSlugs).toEqual(['lagavulin']);
+  });
+
+  it('holder stadig typeIds til id\'er alene', () => {
+    // Slug-vejen er en tilføjelse, ikke en opblødning: et `typeIds` med en
+    // slug i er stadig en fejl, så gamle links ikke stille begynder at
+    // matche noget andet end de plejede.
+    expect(() =>
+      beverageListQuerySchema.parse({ typeIds: 'whisky-skotsk-single-malt' }),
+    ).toThrow();
+  });
+
   it('afviser limit over maks', () => {
     expect(() => beverageListQuerySchema.parse({ limit: '5000' })).toThrow();
   });
