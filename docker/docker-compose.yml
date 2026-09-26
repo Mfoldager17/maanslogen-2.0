@@ -2,6 +2,15 @@
 #
 # MinIO taler samme S3-API som Cloudflare R2, så API'et kører med præcis den
 # samme kode lokalt og i produktion — kun STORAGE_DRIVER og nøglerne skifter.
+#
+# Images hentes fra quay.io og ikke Docker Hub. MinIO slettede minio/minio og
+# minio/mc fra Docker Hub den 11. september 2026, og et `docker compose up`
+# fejler derfor med "pull access denied ... repository does not exist".
+#
+# Tags er låst fast. quay.io serverer stadig de gamle udgaver, men de er
+# frosne — sidste frie udgivelse er fra september 2025 — så `latest` er ikke
+# noget at regne med her. Til en lokal udviklingsopsætning er det fint; det er
+# produktionen der kører på R2.
 
 name: maanslogen
 
@@ -24,7 +33,7 @@ services:
       retries: 10
 
   minio:
-    image: minio/minio:latest
+    image: quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z
     restart: unless-stopped
     command: server /data --console-address ":9001"
     environment:
@@ -44,7 +53,7 @@ services:
   # Opretter bucketen og gør den offentligt læsbar, så billed-URL'er virker
   # ligesom et R2-bucket med et offentligt domæne foran.
   minio-init:
-    image: minio/mc:latest
+    image: quay.io/minio/mc:RELEASE.2025-08-13T08-35-41Z
     depends_on:
       minio:
         condition: service_healthy
