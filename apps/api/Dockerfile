@@ -30,7 +30,11 @@ RUN pnpm --filter @maanslogen/api --prod deploy --legacy /out
 # Generér Prisma-klienten ind i den udrullede kopi. Postinstall ovenfor skrev
 # den ind i repoets node_modules, og `deploy` laver et helt nyt træ — uden
 # dette trin bygger imaget fint og går ned ved opstart.
-RUN cd /out && pnpm exec prisma generate
+#
+# Binæren kaldes direkte frem for gennem `pnpm exec`. /out er ikke et workspace
+# og dets package.json har intet `packageManager`-felt, så corepack ville hente
+# den nyeste pnpm og lade den forsøge at løse et workspace der ikke er der.
+RUN cd /out && ./node_modules/.bin/prisma generate
 
 # ---- Kørsel --------------------------------------------------------------
 FROM node:22-alpine AS runtime

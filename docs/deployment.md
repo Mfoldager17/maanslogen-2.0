@@ -134,8 +134,13 @@ Kører begge bag samme domæne (fx `/api` via en reverse proxy), kan
 ## Migreringer
 
 ```bash
-# I produktion: anvend eksisterende migreringer, ændr ikke schemaet
+# Fra repoet
 pnpm --filter @maanslogen/api db:deploy
+
+# Fra imaget. Binæren kaldes direkte: imaget indeholder ikke et pnpm-workspace,
+# og `pnpm exec` ville få corepack til at hente en pnpm der ikke passer.
+docker run --rm -e DATABASE_URL="$DATABASE_URL" maanslogen-api \
+  ./node_modules/.bin/prisma migrate deploy
 ```
 
 `prisma migrate deploy` er den kommando der hører til produktion — den
