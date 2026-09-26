@@ -196,20 +196,38 @@ som en shell på maskinen, og på et offentligt repo kan enhver åbne et PR.
 
 I stedet spørger Pi'en selv.
 
+Selve appen kommer fra GHCR. Men tre ting kan ikke komme fra et image:
+`Caddyfile` og `init-dev-db.sh` **bind-mountes** ind i containere og skal
+derfor være rigtige filer på værtens disk, `docker-compose.yml` læses fra
+disken, og agenten kører på værten — det er jo den der styrer docker.
+
+Det er 128 KB, ikke hele repoet. Derfor en sparse checkout:
+
 ```bash
 sudo useradd -r -G docker -s /usr/sbin/nologin maanslogen
-sudo git clone https://github.com/Mfoldager17/maanslogen-2.0 /opt/maanslogen
-sudo cp /opt/maanslogen/infra/pi/agent/maanslogen-agent.{service,timer} /etc/systemd/system/
+
+sudo git clone --filter=blob:none --no-checkout --depth 1 \
+  https://github.com/Mfoldager17/maanslogen-2.0 /opt/maanslogen
+cd /opt/maanslogen
+sudo git sparse-checkout set --no-cone infra/pi
+sudo git checkout
+sudo chown -R maanslogen /opt/maanslogen      # agenten skal kunne pulle
+
+sudo cp infra/pi/agent/maanslogen-agent.{service,timer} /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable --now maanslogen-agent.timer
 ```
 
-`/opt/maanslogen` skal blive på `main` — det er den klon agenten kører fra, og
-pointen er netop at et PR ikke kan ændre den:
+Det giver 11 filer og 344 KB i alt.
 
-```bash
-cd /opt/maanslogen && sudo git pull origin main
-```
+Klonen holder sig selv opdateret: `maanslogen-agent.service` kører
+`git pull --ff-only` som `ExecStartPre`, altså før hver kørsel. Det er ikke
+bekvemmelighed — hele sikkerhedsargumentet er at _agenten kører main's kode_,
+og en klon der sakkede bagud ville gøre den påstand usand uden at sige det.
+
+Pull'et ligger i et selvstændigt trin og ikke inde i agenten, fordi bash læser
+et script løbende under kørslen: et script der skriver sig selv om undervejs
+kan ende med at udføre noget sludder.
 
 Følg med:
 

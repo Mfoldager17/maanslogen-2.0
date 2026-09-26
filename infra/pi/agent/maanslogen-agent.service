@@ -5,6 +5,16 @@ Requires=docker.service
 
 [Service]
 Type=oneshot
+
+# Hent nyeste infra/ først. Uden dette kunne klonen sakke bagud, og så ville
+# agenten køre gammel kode — netop den egenskab ("agenten kører main's kode")
+# som sikkerheden hviler på, ville stille og roligt holde op med at passe.
+#
+# Det sker som et selvstændigt trin før ExecStart, og ikke inde i agenten selv:
+# bash læser et script løbende under kørslen, så et script der skriver sig selv
+# om undervejs kan ende med at udføre noget sludder.
+ExecStartPre=-/usr/bin/git -C /opt/maanslogen pull --ff-only --quiet origin main
+
 ExecStart=/opt/maanslogen/infra/pi/agent/maanslogen-agent
 
 # Agenten skal bruge docker, og docker-socket er reelt root. Den kører derfor
@@ -17,7 +27,7 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
-ReadWritePaths=/var/run/docker.sock
+ReadWritePaths=/var/run/docker.sock /opt/maanslogen
 
 [Install]
 WantedBy=multi-user.target

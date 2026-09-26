@@ -40,19 +40,29 @@ produktionsdatabasen.
 
 ## Installation
 
+Appen kommer fra GHCR, men `Caddyfile` og `init-dev-db.sh` bind-mountes ind i
+containere og skal være filer på disken, `docker-compose.yml` læses fra disken,
+og agenten kører på værten. Det er 128 KB — hent kun dem:
+
 ```bash
 sudo useradd -r -G docker -s /usr/sbin/nologin maanslogen
-sudo git clone https://github.com/Mfoldager17/maanslogen-2.0 /opt/maanslogen
+
+sudo git clone --filter=blob:none --no-checkout --depth 1 \
+  https://github.com/Mfoldager17/maanslogen-2.0 /opt/maanslogen
+cd /opt/maanslogen
+sudo git sparse-checkout set --no-cone infra/pi
+sudo git checkout
+sudo chown -R maanslogen /opt/maanslogen
+
 sudo cp infra/pi/agent/maanslogen-agent.{service,timer} /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable --now maanslogen-agent.timer
 ```
 
-Hold `/opt/maanslogen` på `main` — det er den klon agenten kører fra:
-
-```bash
-cd /opt/maanslogen && sudo git pull origin main
-```
+Klonen holder sig selv opdateret gennem `ExecStartPre` i unit-filen. Det er
+ikke bekvemmelighed: hele sikkerhedsargumentet er at agenten kører `main`'s
+kode, og en klon der sakkede bagud ville gøre den påstand usand uden at sige
+det.
 
 ## Se hvad den laver
 
