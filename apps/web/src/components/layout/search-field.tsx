@@ -37,7 +37,8 @@ export function SearchField({ className }: { className?: string }) {
         value={value}
         onChange={(event) => setValue(event.target.value)}
         placeholder="Søg i kataloget"
-        className="h-10 w-full rounded-[var(--radius-control)] border border-line-strong bg-surface pl-9 pr-3 text-sm text-ink placeholder:text-ink-muted"
+        // Samme højde og baggrund som `Input` i @/components/ui/field.
+        className="h-11 w-full min-w-0 rounded-[var(--radius-control)] border border-line-strong bg-canvas pl-9 pr-3 text-sm text-ink placeholder:text-ink-muted"
       />
     </form>
   );

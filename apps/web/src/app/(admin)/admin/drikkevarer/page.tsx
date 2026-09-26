@@ -71,7 +71,8 @@ export default async function AdminBeveragesPage({
     {
       key: "rating",
       header: "Bedømmelse",
-      width: "w-36",
+      // w-36 var 10px for smal til stjerner + snit + et firecifret antal.
+      width: "w-44",
       render: (row) =>
         row.rating.count === 0 ? (
           <span className="text-xs text-ink-muted">—</span>

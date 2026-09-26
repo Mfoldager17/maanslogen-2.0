@@ -3,7 +3,12 @@
 import { useRef, useState } from "react";
 import Image from "next/image";
 import { ImagePlus, X } from "lucide-react";
-import type { MediaAssetInput, MediaOwnerType } from "@maanslogen/contracts";
+import {
+  pickRendition,
+  type MediaAsset,
+  type MediaAssetInput,
+  type MediaOwnerType,
+} from "@maanslogen/contracts";
 import { uploadImage } from "@/lib/upload";
 import { Field, Input } from "@/components/ui/field";
 import { Button } from "@/components/ui/button";
@@ -14,14 +19,23 @@ export function ImageUpload({
   ownerType,
   value,
   onChange,
+  existing,
 }: {
   ownerType: MediaOwnerType;
   value: MediaAssetInput | null;
   onChange: (value: MediaAssetInput | null) => void;
+  /**
+   * Et billede der allerede er gemt. Uden det stod redigeringsformularen med
+   * den tomme "Vælg et billede"-kasse for en drikkevare der havde et billede,
+   * og alt-teksten var blank selvom der var gemt en.
+   */
+  existing?: MediaAsset | null;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
-  const [preview, setPreview] = useState<string | null>(null);
-  const [alt, setAlt] = useState("");
+  const [preview, setPreview] = useState<string | null>(
+    () => pickRendition(existing, "CARD")?.url ?? null,
+  );
+  const [alt, setAlt] = useState(existing?.alt ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -58,7 +72,7 @@ export function ImageUpload({
         </div>
       ) : preview ? (
         <div className="relative h-40 w-full overflow-hidden rounded-[var(--radius-control)] border border-line">
-          {/* Lokal blob-URL, så Next/Image ikke skal optimere den. */}
+          {/* Enten en lokal blob-URL eller det gemte billede — i begge tilfælde er der intet for Next at optimere. */}
           <Image src={preview} alt="" fill unoptimized className="object-cover" />
           <button
             type="button"

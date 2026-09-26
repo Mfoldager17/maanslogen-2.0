@@ -32,7 +32,7 @@ export function Alert({
       )}
     >
       <Icon className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-      <div className="min-w-0">
+      <div className="min-w-0 break-words">
         {title ? <p className="font-semibold">{title}</p> : null}
         {children ? <div className={cn(title && "mt-0.5")}>{children}</div> : null}
       </div>

@@ -6,6 +6,7 @@ import { cn } from "@/lib/cn";
 import { formatRating } from "@/lib/format";
 
 const WORDS: Record<string, string> = {
+  "0.5": "Helt galt",
   "1": "Skuffende",
   "1.5": "Ikke for mig",
   "2": "Går an",
@@ -97,13 +98,13 @@ export function StarInput({
         <span
           className={cn(
             "font-display text-2xl font-semibold tabular",
-            value === 0 && "text-ink-muted",
+            shown === 0 && "text-ink-muted",
           )}
         >
-          {value === 0 ? "–" : formatRating(value)}
+          {shown === 0 ? "–" : formatRating(shown)}
         </span>
         <span className="text-sm text-ink-muted">
-          {value === 0 ? "Vælg en bedømmelse" : (WORDS[String(value)] ?? "")}
+          {shown === 0 ? "Vælg en bedømmelse" : (WORDS[String(shown)] ?? "")}
         </span>
       </p>
 

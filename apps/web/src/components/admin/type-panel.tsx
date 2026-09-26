@@ -4,6 +4,7 @@ import type { BeverageType, Category } from "@maanslogen/contracts";
 import { api } from "@/lib/api/api.browser";
 import { SimpleResourcePanel } from "./simple-resource-panel";
 import { Field, Input, NativeSelect, Textarea } from "@/components/ui/field";
+import { formatNumber } from "@/lib/format";
 
 interface Draft {
   categoryId: string;
@@ -40,7 +41,10 @@ export function TypePanel({
         subtitle: `${categoryName.get(type.categoryId) ?? "?"} · /${type.slug}`,
         meta:
           type.beverageCount === undefined ? null : (
-            <span className="tabular text-xs text-ink-muted">{type.beverageCount} drikke</span>
+            <span className="tabular shrink-0 whitespace-nowrap text-xs text-ink-muted">
+              {formatNumber(type.beverageCount)}{" "}
+              {type.beverageCount === 1 ? "drikkevare" : "drikkevarer"}
+            </span>
           ),
       }))}
       emptyDraft={{

@@ -24,7 +24,13 @@ export function DataTable<T extends { id: string }>({
 
   return (
     <div className="overflow-x-auto rounded-[var(--radius-card)] border border-line bg-surface">
-      <table className="w-full min-w-3xl border-collapse text-sm">
+      {/*
+       * `table-fixed`: uden den bruger browseren den automatiske
+       * tabelalgoritme, hvor `column.width` kun er et forslag indholdet frit
+       * kan overtrumfe. Lange navne og e-mails strakte derfor deres kolonne
+       * og klemte naboerne sammen, uanset hvad kolonnen bad om.
+       */}
+      <table className="w-full min-w-3xl table-fixed border-collapse text-sm">
         {caption ? <caption className="sr-only">{caption}</caption> : null}
         <thead>
           <tr className="border-b border-line bg-sunken">
@@ -49,7 +55,11 @@ export function DataTable<T extends { id: string }>({
               {columns.map((column) => (
                 <td
                   key={column.key}
-                  className={cn("px-4 py-3 align-middle", column.align === "right" && "text-right")}
+                  className={cn(
+                    "px-4 py-3 align-middle",
+                    column.align === "right" && "text-right",
+                    column.width,
+                  )}
                 >
                   {column.render(row)}
                 </td>

@@ -29,7 +29,7 @@ export function Field({
   const errorId = error ? `${id}-error` : undefined;
 
   return (
-    <div className={cn("flex flex-col gap-1.5", className)}>
+    <div className={cn("flex min-w-0 flex-col gap-1.5", className)}>
       <label htmlFor={id} className="text-sm font-semibold text-ink">
         {label}
         {required ? (
@@ -68,7 +68,7 @@ export interface FieldControlProps {
 }
 
 const CONTROL_BASE =
-  "w-full rounded-[var(--radius-control)] border bg-canvas px-3 text-sm text-ink " +
+  "w-full min-w-0 rounded-[var(--radius-control)] border bg-canvas px-3 text-sm text-ink " +
   "placeholder:text-ink-muted transition-colors " +
   "disabled:cursor-not-allowed disabled:opacity-60 " +
   "aria-[invalid=true]:border-danger aria-[invalid=true]:bg-danger-soft";

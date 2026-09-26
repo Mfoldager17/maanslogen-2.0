@@ -32,6 +32,16 @@ export function ReviewForm({ form, slug }: { form: ReviewFormData; slug: string 
     ),
   );
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  /** Fejlen hører til den værdi der fejlede, så den forsvinder når værdien ændres. */
+  function ryd(felt: string) {
+    setErrors((current) => {
+      if (!(felt in current)) return current;
+      const next = { ...current };
+      delete next[felt];
+      return next;
+    });
+  }
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
 
@@ -124,7 +134,14 @@ export function ReviewForm({ form, slug }: { form: ReviewFormData; slug: string 
         <legend className="px-2 text-xs font-bold uppercase tracking-[0.12em] text-ink-muted">
           Din bedømmelse
         </legend>
-        <StarInput value={rating} onChange={setRating} error={errors.rating} />
+        <StarInput
+          value={rating}
+          onChange={(next) => {
+            setRating(next);
+            ryd("rating");
+          }}
+          error={errors.rating}
+        />
       </fieldset>
 
       <div className="flex flex-col gap-4 rounded-[var(--radius-card)] border border-line bg-surface p-5">
@@ -173,7 +190,10 @@ export function ReviewForm({ form, slug }: { form: ReviewFormData; slug: string 
               key={question.id}
               question={question}
               value={answers[question.id] ?? null}
-              onChange={(value) => setAnswers((current) => ({ ...current, [question.id]: value }))}
+              onChange={(value) => {
+                setAnswers((current) => ({ ...current, [question.id]: value }));
+                ryd(question.id);
+              }}
               error={errors[question.id]}
             />
           ))}

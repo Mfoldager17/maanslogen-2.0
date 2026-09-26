@@ -77,9 +77,15 @@ function Control({
       return (
         <div className="flex flex-wrap items-center gap-3">
           {question.scale?.minLabel ? (
-            <span className="w-20 text-xs text-ink-muted">{question.scale.minLabel}</span>
+            <span
+              className="max-w-28 shrink-0 truncate text-xs text-ink-muted"
+              title={question.scale.minLabel}
+            >
+              {question.scale.minLabel}
+            </span>
           ) : null}
-          <div className="flex gap-2">
+          {/* En skala med mange trin skal ombrydes, ikke skubbe siden ud til siden. */}
+          <div className="flex min-w-0 flex-wrap gap-2">
             {steps.map((step) => (
               <button
                 key={step}
@@ -98,7 +104,10 @@ function Control({
             ))}
           </div>
           {question.scale?.maxLabel ? (
-            <span className="w-20 text-right text-xs text-ink-muted">
+            <span
+              className="max-w-28 shrink-0 truncate text-right text-xs text-ink-muted"
+              title={question.scale.maxLabel}
+            >
               {question.scale.maxLabel}
             </span>
           ) : null}

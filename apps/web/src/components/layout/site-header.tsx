@@ -39,14 +39,14 @@ export function SiteHeader({ user }: { user: User | null }) {
           {user ? (
             <>
               {roleAtLeast(user.role, "MODERATOR") ? (
-                <Button asChild variant="secondary" size="sm" className="hidden sm:inline-flex">
+                <Button asChild variant="secondary" size="md" className="hidden sm:inline-flex">
                   <Link href="/admin">Admin</Link>
                 </Button>
               ) : null}
               <UserMenu user={user} />
             </>
           ) : (
-            <Button asChild variant="secondary" size="sm">
+            <Button asChild variant="secondary" size="md">
               <Link href="/log-ind">Log ind</Link>
             </Button>
           )}

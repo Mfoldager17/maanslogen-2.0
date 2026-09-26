@@ -37,8 +37,8 @@ export function TasteProfilePanel({ profile }: { profile: TasteProfile }) {
             return (
               <div key={entry.questionId}>
                 <div className="mb-1.5 flex items-baseline justify-between gap-3 text-sm">
-                  <dt className="text-ink-soft">{entry.prompt}</dt>
-                  <dd className="tabular font-semibold">
+                  <dt className="min-w-0 text-ink-soft">{entry.prompt}</dt>
+                  <dd className="tabular shrink-0 whitespace-nowrap font-semibold">
                     {entry.average === null ? "—" : formatNumber(entry.average)}
                     <span className="font-normal text-ink-muted"> / {max}</span>
                   </dd>

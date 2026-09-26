@@ -4,7 +4,7 @@ import type { Brand, Category } from "@maanslogen/contracts";
 import { api } from "@/lib/api/api.browser";
 import { SimpleResourcePanel } from "./simple-resource-panel";
 import { Field, Input, Textarea } from "@/components/ui/field";
-import { formatCountry } from "@/lib/format";
+import { formatCountry, formatNumber } from "@/lib/format";
 import { cn } from "@/lib/cn";
 
 interface Draft {
@@ -45,7 +45,10 @@ export function BrandPanel({ brands, categories }: { brands: Brand[]; categories
         subtitle: [formatCountry(brand.countryCode), `/${brand.slug}`].filter(Boolean).join(" · "),
         meta:
           brand.beverageCount === undefined ? null : (
-            <span className="tabular text-xs text-ink-muted">{brand.beverageCount} drikke</span>
+            <span className="tabular shrink-0 whitespace-nowrap text-xs text-ink-muted">
+              {formatNumber(brand.beverageCount)}{" "}
+              {brand.beverageCount === 1 ? "drikkevare" : "drikkevarer"}
+            </span>
           ),
       }))}
       emptyDraft={EMPTY}

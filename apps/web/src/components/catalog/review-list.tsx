@@ -26,17 +26,19 @@ export function ReviewList({ reviews }: { reviews: Review[] }) {
                 {initialsOf(review.author.displayName)}
               </span>
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-semibold">{review.author.displayName}</p>
+                <p className="truncate text-sm font-semibold" title={review.author.displayName}>
+                  {review.author.displayName}
+                </p>
                 <p className="text-xs text-ink-muted">
                   <time dateTime={review.createdAt}>{formatRelative(review.createdAt)}</time>
                 </p>
               </div>
-              <StarRating value={review.rating} size="sm" showValue={false} />
+              <StarRating value={review.rating} size="sm" showValue={false} className="shrink-0" />
             </header>
 
-            {review.title ? <h3 className="font-semibold">{review.title}</h3> : null}
+            {review.title ? <h3 className="break-words font-semibold">{review.title}</h3> : null}
             {review.body ? (
-              <p className="mt-1 whitespace-pre-line text-sm leading-relaxed text-ink-soft">
+              <p className="mt-1 break-words whitespace-pre-line text-sm leading-relaxed text-ink-soft">
                 {review.body}
               </p>
             ) : null}

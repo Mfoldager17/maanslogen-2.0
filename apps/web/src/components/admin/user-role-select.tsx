@@ -3,7 +3,15 @@
 import { roleSchema, type Role } from "@maanslogen/contracts";
 import { useId } from "react";
 import { api } from "@/lib/api/api.browser";
+import { NativeSelect } from "@/components/ui/field";
 import { useApiMutation } from "@/lib/use-mutation";
+
+/** Rollerne hedder noget på dansk i resten af fladen; enum-værdien er API'ets. */
+const ROLLER: Record<Role, string> = {
+  USER: "Bruger",
+  MODERATOR: "Moderator",
+  ADMIN: "Administrator",
+};
 
 /**
  * Rolleskift bumper brugerens tokenVersion i API'et, så en degradering
@@ -26,7 +34,7 @@ export function UserRoleSelect({
       <label htmlFor={id} className="sr-only">
         Rolle
       </label>
-      <select
+      <NativeSelect
         id={id}
         defaultValue={role}
         disabled={disabled || mutation.pending}
@@ -35,14 +43,13 @@ export function UserRoleSelect({
             success: "Rollen er opdateret",
           })
         }
-        className="h-9 rounded-[var(--radius-control)] border border-line-strong bg-surface px-2 text-sm disabled:opacity-60"
       >
         {roleSchema.options.map((option) => (
           <option key={option} value={option}>
-            {option}
+            {ROLLER[option]}
           </option>
         ))}
-      </select>
+      </NativeSelect>
     </>
   );
 }

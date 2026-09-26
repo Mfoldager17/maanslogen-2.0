@@ -53,7 +53,7 @@ export function ConfirmDelete({
 
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-50 bg-ink/40 backdrop-blur-sm" />
-        <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-[min(28rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 rounded-[var(--radius-card)] border border-line bg-surface p-6 shadow-[var(--shadow-pop)]">
+        <Dialog.Content className="fixed left-1/2 top-1/2 z-50 max-h-[calc(100dvh-2rem)] w-[min(28rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-[var(--radius-card)] border border-line bg-surface p-6 shadow-[var(--shadow-pop)]">
           <Dialog.Title className="font-display text-xl font-semibold">Fjern {label}?</Dialog.Title>
           <Dialog.Description className="mt-1.5 text-sm text-ink-muted">
             {description ?? "Handlingen kan ikke fortrydes herfra."}

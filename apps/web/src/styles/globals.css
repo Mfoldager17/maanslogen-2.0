@@ -1,5 +1,13 @@
 @import "tailwindcss";
 
+/*
+ * Temaet styres af klassen `.dark` på <html>, ikke af styresystemet. Uden
+ * denne linje peger Tailwinds `dark:` stadig på `prefers-color-scheme`, og
+ * så viste temaknappen månen i mørkt tema på en lys maskine — og solen i
+ * lyst tema på en mørk.
+ */
+@custom-variant dark (&:where(.dark, .dark *));
+
 /* ==========================================================================
    Designtokens
    Alt farve, radius og skygge lever som CSS-variabler. Mørkt tema skifter kun
@@ -112,6 +120,14 @@
 
   --star: #e0a94a;
   --star-empty: #3a322a;
+
+  /*
+   * Skyggerne er blækbrune ved 4-8 % i lyst tema. På en næsten sort flade
+   * forsvinder de helt, så kort mistede deres hover-løft og dialoger flød
+   * sammen med baggrunden. Mørkt tema skygger med sort, og kraftigere.
+   */
+  --shadow-raise: 0 1px 2px rgb(0 0 0 / 0.3), 0 8px 24px -12px rgb(0 0 0 / 0.45);
+  --shadow-pop: 0 4px 12px rgb(0 0 0 / 0.4), 0 24px 48px -24px rgb(0 0 0 / 0.6);
 }
 
 @layer base {
@@ -170,13 +186,18 @@
   }
 }
 
+/*
+ * Kun vippet — centreringen sidder på beholderen. Lå `translateX(-50%)` her,
+ * mistede bølgen sin placering i det øjeblik animationen ikke kørte, og med
+ * "reducer bevægelse" slået til hoppede den en halv bredde til højre.
+ */
 @keyframes mlg-surface-wobble {
   0%,
   100% {
-    transform: translateX(-50%) rotate(-2.5deg) scaleY(1);
+    transform: rotate(-2.5deg) scaleY(1);
   }
   50% {
-    transform: translateX(-50%) rotate(2.5deg) scaleY(0.85);
+    transform: rotate(2.5deg) scaleY(0.85);
   }
 }
 
@@ -257,12 +278,19 @@
   }
 }
 
+/*
+ * Fliser præcis én gang pr. omgang. Flisen er `background-size` (200 % af
+ * elementet), og et procent-skift på -200 % flytter baggrunden nøjagtig én
+ * flise — så slutbilledet er identisk med startbilledet, og løkken er
+ * sømløs. Den gamle udgave flyttede 1,855 flise og sprang derfor synligt
+ * hvert 1,6. sekund. Retningen er nu venstre mod højre.
+ */
 @keyframes mlg-shimmer {
-  0% {
-    background-position: -120% 0;
+  from {
+    background-position: 0 0;
   }
-  100% {
-    background-position: 220% 0;
+  to {
+    background-position: -200% 0;
   }
 }
 
@@ -289,11 +317,12 @@
 @utility skeleton {
   background-image: linear-gradient(
     100deg,
-    var(--sunken) 30%,
+    var(--sunken) 40%,
     color-mix(in oklab, var(--sunken) 60%, var(--surface)) 50%,
-    var(--sunken) 70%
+    var(--sunken) 60%
   );
-  background-size: 220% 100%;
+  background-size: 200% 100%;
+  background-repeat: repeat;
   animation: mlg-shimmer 1.6s linear infinite;
 }
 
@@ -307,6 +336,11 @@
   *::after {
     animation-duration: 0.001ms !important;
     animation-iteration-count: 1 !important;
+    /*
+     * `both`: uden den springer alt tilbage til tilstanden før animationen,
+     * så boblerne blev stående som faste prikker i stedet for at forsvinde.
+     */
+    animation-fill-mode: both !important;
     transition-duration: 0.001ms !important;
   }
 }

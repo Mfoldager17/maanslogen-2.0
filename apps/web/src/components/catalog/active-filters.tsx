@@ -88,10 +88,13 @@ export function ActiveFilters({
           key={chip.key}
           type="button"
           onClick={() => clear(chip.key)}
-          className="inline-flex h-8 items-center gap-1.5 rounded-full border border-accent-line bg-accent-soft pl-3 pr-2.5 text-xs font-medium text-accent-hover transition-colors hover:bg-accent-soft/70"
+          title={chip.label}
+          // Pillen har fast højde, så etiketten må ikke ombrydes — en lang søgning
+          // eller en liste af lande skrev sig ellers ud over den farvede baggrund.
+          className="inline-flex h-8 max-w-full min-w-0 items-center gap-1.5 rounded-full border border-accent-line bg-accent-soft pl-3 pr-2.5 text-xs font-medium text-accent-hover transition-colors hover:bg-accent-soft/70"
         >
-          {chip.label}
-          <X className="h-3 w-3" aria-hidden="true" />
+          <span className="truncate">{chip.label}</span>
+          <X className="h-3 w-3 shrink-0" aria-hidden="true" />
           <span className="sr-only">Fjern filter</span>
         </button>
       ))}

@@ -96,9 +96,13 @@ export function SimpleResourcePanel<TDraft, TItem extends ResourceItem>({
                 )}
               >
                 <div className="min-w-0 flex-1">
-                  <p className="truncate font-semibold">{item.title}</p>
+                  <p className="truncate font-semibold" title={item.title}>
+                    {item.title}
+                  </p>
                   {item.subtitle ? (
-                    <p className="truncate text-xs text-ink-muted">{item.subtitle}</p>
+                    <p className="truncate text-xs text-ink-muted" title={item.subtitle}>
+                      {item.subtitle}
+                    </p>
                   ) : null}
                 </div>
                 {item.meta}
