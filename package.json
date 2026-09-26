@@ -17,12 +17,13 @@
     "test": "turbo run test",
     "format": "prettier --write \"**/*.{ts,tsx,js,mjs,json,md,css}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,mjs,json,md,css}\"",
-    "db:migrate": "pnpm --filter @maanslogen/api db:migrate",
-    "db:push": "pnpm --filter @maanslogen/api db:push",
-    "db:seed": "pnpm --filter @maanslogen/api db:seed",
-    "db:studio": "pnpm --filter @maanslogen/api db:studio",
+    "db:migrate": "pnpm build:contracts && pnpm --filter @maanslogen/api db:migrate",
+    "db:push": "pnpm build:contracts && pnpm --filter @maanslogen/api db:push",
+    "db:seed": "pnpm build:contracts && pnpm --filter @maanslogen/api db:seed",
+    "db:studio": "pnpm build:contracts && pnpm --filter @maanslogen/api db:studio",
     "infra:up": "docker compose -f docker/docker-compose.yml up -d",
-    "infra:down": "docker compose -f docker/docker-compose.yml down"
+    "infra:down": "docker compose -f docker/docker-compose.yml down",
+    "build:contracts": "pnpm --filter @maanslogen/contracts build"
   },
   "devDependencies": {
     "prettier": "^3.6.2",
