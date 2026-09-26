@@ -45,6 +45,7 @@ export class MediaService {
         return {
           variant,
           uploadUrl: presigned.uploadUrl,
+          headers: presigned.headers,
           storageKey: presigned.storageKey,
           publicUrl: presigned.publicUrl,
           width: size.width,

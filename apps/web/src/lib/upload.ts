@@ -32,10 +32,13 @@ export async function uploadImage(
     presigned.uploads.map(async (upload) => {
       const blob = await resize(file, upload.width, upload.height, contentType);
 
+      // Headerne kommer fra API'et, fordi de indgår i signaturen — og fordi
+      // det er dér `Cache-Control` sættes, som afgør om Cloudflare må cache
+      // filen i stedet for at spørge R2 hver gang.
       const response = await fetch(upload.uploadUrl, {
         method: 'PUT',
         body: blob,
-        headers: { 'content-type': contentType },
+        headers: upload.headers,
       });
       if (!response.ok) {
         throw new Error(`Upload af ${upload.variant} fejlede (${response.status})`);

@@ -142,7 +142,7 @@ side.
 | **Kategori-ikoner**  | Gemt som en `Image`-række med emojien i `url`-feltet                                                  | Et `icon`-felt                                                                                           |
 | **Billeder**         | Hver størrelse var en løsrevet række uden sammenhæng                                                  | `MediaAsset` med `MediaRendition`-varianter og alt-tekst                                                 |
 | **Controllere**      | Parallelle `admin/`- og `web/`-controllere med hver sit DTO-sæt for samme data                        | Ét sæt endpoints; læsning offentlig, skrivning rollebeskyttet                                            |
-| **Test**             | Ingen                                                                                                 | 125: kontrakter, unit og e2e mod en rigtig Postgres                                                      |
+| **Test**             | Ingen                                                                                                 | 132: kontrakter, unit og e2e mod en rigtig Postgres                                                      |
 
 > Det fulde regnskab: [`docs/architecture.md`](docs/architecture.md)
 
@@ -178,7 +178,7 @@ I `apps/api`:
 
 ```bash
 pnpm test                        # 65 unit-tests: kontrakter, API og web
-pnpm --filter @maanslogen/api test:e2e   # 60 e2e mod en rigtig Postgres
+pnpm --filter @maanslogen/api test:e2e   # 67 e2e mod en rigtig Postgres
 ```
 
 E2E-testene kører mod en rigtig database — ikke mocks. Det er netop

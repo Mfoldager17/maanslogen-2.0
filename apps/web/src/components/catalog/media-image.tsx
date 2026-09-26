@@ -89,6 +89,17 @@ export function MediaImage({
         fill
         sizes={sizes ?? "(max-width: 768px) 50vw, 25vw"}
         priority={priority}
+        /**
+         * Billedet er allerede skaleret til netop denne variant ved upload, så
+         * der er intet for Next at optimere. Slår man det til, henter vores
+         * egen server filen fra R2 for at gen-kode den — altså en R2-læsning
+         * *og* CPU-tid for noget der allerede er gjort.
+         *
+         * Uoptimeret går browseren direkte til Cloudflare-domænet foran
+         * bucketen, hvor et cache-hit slet ikke rører R2. Lazy loading og den
+         * reserverede plads (ingen layoutskift) får vi stadig fra next/image.
+         */
+        unoptimized
         className="object-cover"
       />
     </span>

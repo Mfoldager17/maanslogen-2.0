@@ -1,11 +1,7 @@
 import { Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import {
-  DeleteObjectsCommand,
-  HeadObjectCommand,
-  PutObjectCommand,
-  S3Client,
-} from '@aws-sdk/client-s3';
+import { DeleteObjectsCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import { IMMUTABLE_CACHE_CONTROL } from '@maanslogen/contracts';
 import { CONFIG, type AppConfig } from '../../config/env';
 import { publicUrlFor, setMediaPublicBaseUrl } from './media.mapper';
 
@@ -13,6 +9,8 @@ export interface PresignedPut {
   uploadUrl: string;
   storageKey: string;
   publicUrl: string;
+  /** Headers klienten skal sende. De indgår i signaturen. */
+  headers: Record<string, string>;
   expiresAt: Date;
 }
 
@@ -86,14 +84,31 @@ export class StorageService implements OnModuleInit {
     return `${ownerType.toLowerCase()}/${year}/${month}/${assetId}/${variant.toLowerCase()}.${extension}`;
   }
 
+  /**
+   * Presigner en PUT og beder klienten sætte `Cache-Control` på objektet.
+   *
+   * Uden den header serverer objektlageret filen uden cache-instruks, og hver
+   * visning bliver en læsning. Nøglerne er uforanderlige — hvert upload får sit
+   * eget UUID og bliver aldrig overskrevet — så filen kan caches for evigt.
+   *
+   * Presignede URL'er signerer kun `host`, så headeren er ikke håndhævet.
+   * Den styrer browserens cache; edge-cachen garanteres af Cache Rule'en i
+   * Cloudflare (se docs/r2-omkostninger.md).
+   */
   async presignPut(storageKey: string, contentType: string): Promise<PresignedPut> {
     const expiresIn = this.config.UPLOAD_URL_TTL_SECONDS;
+    const headers = {
+      'content-type': contentType,
+      'cache-control': IMMUTABLE_CACHE_CONTROL,
+    };
+
     const uploadUrl = await getSignedUrl(
       this.client,
       new PutObjectCommand({
         Bucket: this.bucket,
         Key: storageKey,
         ContentType: contentType,
+        CacheControl: IMMUTABLE_CACHE_CONTROL,
       }),
       { expiresIn },
     );
@@ -102,24 +117,9 @@ export class StorageService implements OnModuleInit {
       uploadUrl,
       storageKey,
       publicUrl: this.getPublicUrl(storageKey),
+      headers,
       expiresAt: new Date(Date.now() + expiresIn * 1_000),
     };
-  }
-
-  /**
-   * Bekræfter at klienten faktisk uploadede filen, og hvor stor den blev.
-   * En presigned PUT kan ikke håndhæve en maksimal størrelse, så grænsen
-   * kontrolleres her, når uploadet gøres krav på.
-   */
-  async statObject(storageKey: string): Promise<{ bytes: number; contentType?: string } | null> {
-    try {
-      const result = await this.client.send(
-        new HeadObjectCommand({ Bucket: this.bucket, Key: storageKey }),
-      );
-      return { bytes: result.ContentLength ?? 0, contentType: result.ContentType };
-    } catch {
-      return null;
-    }
   }
 
   /** Sletter kun navngivne nøgler — aldrig præfikser eller buckets. */

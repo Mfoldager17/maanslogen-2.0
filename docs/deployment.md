@@ -47,6 +47,13 @@ Browseren uploader direkte til R2 med presignede URL'er, så bucketen skal tilla
 
 Uden dette fejler uploads i browseren, mens API'et ser helt sundt ud.
 
+### Caching
+
+Den vigtigste indstilling for regningen er en Cache Rule foran bucketen: et
+cache-hit på Cloudflares kant er ikke en R2-operation. Se
+[`r2-omkostninger.md`](r2-omkostninger.md) for den konkrete opsætning og
+regnestykket bag.
+
 ### Livscyklusregel (anbefalet)
 
 API'et rydder selv uafhentede uploads op hver time, men en livscyklusregel i R2 er
