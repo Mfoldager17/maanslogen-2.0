@@ -9,7 +9,7 @@ GitHub-hosted runner (ubuntu-24.04-arm, gratis på offentligt repo)
    ▼
 GHCR  ghcr.io/mfoldager17/maanslogen-api:{main,pr-42}
    │
-   │   Pi'en spørger hvert andet minut:
+   │   Pi'en spørger hvert femte minut:
    │     · hvilke åbne PR'er har label "preview"?
    │     · er der et nyt :main-image?
    ▼
