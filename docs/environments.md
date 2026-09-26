@@ -74,6 +74,18 @@ står nedenfor, og den er værd at kende.
 
 Én gang. Regn med en times tid.
 
+**Rækkefølgen betyder noget.** Pi'ens containere hentes fra GHCR, så imaget
+skal findes, før Pi'en kan komme op. Kort sagt:
+
+|     |                               |                                           |
+| --- | ----------------------------- | ----------------------------------------- |
+| 1   | Cloudflare                    | token, buckets, tunnel, DNS               |
+| 2   | GitHub                        | hemmeligheder, variabler, `preview`-label |
+| 3   | Push til `main`               | bygger imaget og lægger det i GHCR        |
+| 4   | **Gør GHCR-pakken offentlig** | ellers kan Pi'en ikke hente den           |
+| 5   | Pi'en                         | `.env`, `compose up`, agent, seed         |
+| 6   | Første `wrangler deploy`      | så Worker'en findes                       |
+
 ### 1. Cloudflare
 
 Opret et API-token under _My Profile → API Tokens_ med **Edit** på: Zone DNS,
@@ -104,7 +116,25 @@ Bagefter, i hånden i dashboardet:
 - **Caching → Tiered Cache**: slå Smart Tiered Caching til. Gratis, og det
   skærer i Class B-operationerne. Se [`r2-omkostninger.md`](r2-omkostninger.md).
 
-### 2. Pi'en
+### 2. GHCR-pakken skal være offentlig
+
+Første push til `main` bygger API-imaget og lægger det i GHCR. **Pakken er
+privat som udgangspunkt**, og Pi'en har med vilje ingen credentials — så
+`docker pull` ville svare `denied`, og agenten ville vente i det uendelige på
+et image den ikke må se.
+
+Efter første vellykkede kørsel af _Udrul_: gå til repoets forside →
+**Packages** → `maanslogen-api` → _Package settings_ → **Change visibility** →
+_Public_.
+
+Koden er offentlig i forvejen, så imaget afslører ikke noget nyt.
+
+> Vil du hellere holde pakken privat, skal Pi'en logge ind:
+> `docker login ghcr.io -u <bruger> -p <token>` med et token der har
+> `read:packages`. Så har Pi'en til gengæld en credential, og det var netop
+> det vi gerne ville undgå.
+
+### 3. Pi'en
 
 ```bash
 git clone https://github.com/Mfoldager17/maanslogen-2.0 ~/maanslogen
@@ -158,7 +188,7 @@ docker run --rm --network maanslogen -e DATABASE_URL="$dev_url" \
   maanslogen-api:dev ./node_modules/.bin/prisma db seed
 ```
 
-### 3. Agenten på Pi'en
+### 4. Agenten på Pi'en
 
 Pi'en skal kunne starte containere ud fra det GitHub siger. Det gøres **ikke**
 med en selvhostet runner: den ville få tilsendt workflow-kode og udføre den
@@ -209,7 +239,10 @@ sudo systemctl start maanslogen-agent    # kør med det samme
 > **shell på værten**, med adgang til hemmelighedsfilen og docker-socket — og
 > docker-socket er reelt root. En container er en helt almindelig sandkasse.
 
-### 4. Hemmeligheder og variabler i GitHub
+### 5. Hemmeligheder, variabler og label i GitHub
+
+Opret først label'en **`preview`** under _Issues → Labels_. Den er porten til
+et preview-miljø; uden den sker der ingenting, når du sætter den på et PR.
 
 _Settings → Secrets and variables → Actions_.
 
@@ -233,7 +266,7 @@ Variables:
 | `PROD_MEDIA_HOST`   | `media.maanslogen.dk`     |
 | `DEV_MEDIA_HOST`    | `media.dev.maanslogen.dk` |
 
-### 5. Første udrulning
+### 6. Første udrulning
 
 ```bash
 cd apps/web
@@ -242,6 +275,18 @@ CLOUDFLARE_API_TOKEN=... NEXT_PUBLIC_API_URL=https://api.maanslogen.dk pnpm cf:d
 
 Worker'en skal findes én gang, før `versions upload` kan lægge versioner op i
 den. Derefter klarer `deploy.yml` det ved hvert push til `main`.
+
+Så er du kørende. Tjek til sidst:
+
+```bash
+# På Pi'en
+docker ps                              # postgres, api, api-dev, caddy, cloudflared
+journalctl -u maanslogen-agent -n 20   # "api: opdateret" eller ingen ændring
+
+# Udefra
+curl -s https://api.maanslogen.dk/api/v1/health/ready
+curl -s https://maanslogen.dk -o /dev/null -w '%{http_code}\n'
+```
 
 ---
 
