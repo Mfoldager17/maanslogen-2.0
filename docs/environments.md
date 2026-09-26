@@ -145,15 +145,19 @@ docker build -f apps/api/Dockerfile -t maanslogen-api:latest .
 docker tag maanslogen-api:latest maanslogen-api:dev
 
 . infra/pi/load-env.sh
-for db in maanslogen maanslogen_dev; do
-  docker run --rm --network maanslogen \
-    -e DATABASE_URL="postgresql://$POSTGRES_USER:$POSTGRES_PASSWORD@postgres:5432/$db?schema=public" \
-    maanslogen-api:latest ./node_modules/.bin/prisma migrate deploy
-done
+
+# Produktionen migreres med den rolle der ejer den.
+docker run --rm --network maanslogen \
+  -e DATABASE_URL="postgresql://$POSTGRES_USER:$POSTGRES_PASSWORD@postgres:5432/maanslogen?schema=public" \
+  maanslogen-api:latest ./node_modules/.bin/prisma migrate deploy
+
+# Dev har sin egen rolle, som ikke kan forbinde til produktionen.
+dev_url="postgresql://maanslogen_dev:$DEV_POSTGRES_PASSWORD@postgres:5432/maanslogen_dev?schema=public"
+docker run --rm --network maanslogen -e DATABASE_URL="$dev_url" \
+  maanslogen-api:dev ./node_modules/.bin/prisma migrate deploy
 
 # Kun dev får testdata. Produktionen starter tom.
-docker run --rm --network maanslogen \
-  -e DATABASE_URL="postgresql://$POSTGRES_USER:$POSTGRES_PASSWORD@postgres:5432/maanslogen_dev?schema=public" \
+docker run --rm --network maanslogen -e DATABASE_URL="$dev_url" \
   maanslogen-api:dev ./node_modules/.bin/prisma db seed
 ```
 
@@ -303,8 +307,21 @@ forfra.
 > den siger ikke fra — den melder "Database reset successful" og efterlader en
 > tom database. Workflowet tæller rækker bagefter og fejler hvis der er nul.
 
-Produktionsdatabasen røres aldrig af noget af det her. Den har sine egne
-JWT-nøgler, sin egen bucket og sit eget skema.
+Produktionsdatabasen røres aldrig af noget af det her, og det er håndhævet i
+databasen frem for kun aftalt: dev kører som rollen `maanslogen_dev`, som ikke
+har CONNECT på produktionsdatabasen. Forsøger noget alligevel, svarer Postgres
+
+```
+FATAL: permission denied for database "maanslogen"
+DETAIL: User does not have CONNECT privilege.
+```
+
+Den adskillelse er vigtigere end den ser ud. Uden den fik previews præcis
+samme credentials som produktionen, og kun databasenavnet i forbindelses-URL'en
+skilte dem ad — ét ord, som enhver kode i containeren kan ændre.
+
+Produktionen har derudover sine egne JWT-nøgler, sin egen bucket og sit eget
+skema.
 
 ---
 

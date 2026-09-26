@@ -42,7 +42,7 @@ jobs:
         run: |
           . ./load-env.sh
           docker run --rm --network maanslogen \
-            -e DATABASE_URL="postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/maanslogen_dev?schema=public" \
+            -e DATABASE_URL="postgresql://maanslogen_dev:${DEV_POSTGRES_PASSWORD}@postgres:5432/maanslogen_dev?schema=public" \
             maanslogen-api:${{ github.sha }} ./node_modules/.bin/prisma migrate deploy
 
       - name: Genstart API'erne

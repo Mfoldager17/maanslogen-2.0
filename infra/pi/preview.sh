@@ -30,7 +30,7 @@ case "$action" in
     # migreres her, så en PR med en ny migrering kan prøves af — bemærk at det
     # rammer alle andre previews samtidig. Se docs/environments.md.
     docker run --rm --network maanslogen \
-      -e DATABASE_URL="postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/maanslogen_dev?schema=public" \
+      -e DATABASE_URL="postgresql://maanslogen_dev:${DEV_POSTGRES_PASSWORD}@postgres:5432/maanslogen_dev?schema=public" \
       "$image" ./node_modules/.bin/prisma migrate deploy
 
     docker rm -f "$container" >/dev/null 2>&1 || true
@@ -38,7 +38,7 @@ case "$action" in
       --label maanslogen.preview="$pr" \
       -e NODE_ENV=production \
       -e PORT=4000 \
-      -e DATABASE_URL="postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/maanslogen_dev?schema=public" \
+      -e DATABASE_URL="postgresql://maanslogen_dev:${DEV_POSTGRES_PASSWORD}@postgres:5432/maanslogen_dev?schema=public" \
       -e JWT_ACCESS_SECRET="${DEV_JWT_ACCESS_SECRET}" \
       -e JWT_REFRESH_SECRET="${DEV_JWT_REFRESH_SECRET}" \
       -e CORS_ORIGINS="${web_origin}" \

@@ -25,7 +25,7 @@ jobs:
         working-directory: infra/pi
         run: |
           . ./load-env.sh
-          url="postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/maanslogen_dev?schema=public"
+          url="postgresql://maanslogen_dev:${DEV_POSTGRES_PASSWORD}@postgres:5432/maanslogen_dev?schema=public"
 
           # To trin, ikke ét. Prisma 6's `migrate reset` kørte seed-scriptet
           # til sidst; Prisma 7 gør det ikke, og den siger ikke fra — den
@@ -43,7 +43,7 @@ jobs:
         run: |
           . ./load-env.sh
           antal=$(docker compose --env-file "$MAANSLOGEN_ENV_FILE" exec -T postgres psql -qtAX \
-            -U "$POSTGRES_USER" -d maanslogen_dev -c 'SELECT count(*) FROM beverages')
+            -U maanslogen_dev -d maanslogen_dev -c 'SELECT count(*) FROM beverages')
           echo "drikkevarer i dev-databasen: $antal"
           # En tom database her betyder at seed'en fejlede uden at sige det.
           [ "$antal" -gt 0 ] || { echo 'dev-databasen er tom efter seed' >&2; exit 1; }
