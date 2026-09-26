@@ -1,0 +1,425 @@
+// Maanslogen 2.0 — datamodel
+//
+// Ændringer i forhold til 1.0:
+//  * Rigtige enums i stedet for frie strenge (dataType, answerType, roller).
+//  * Slugs på alt der har en URL, så frontend ikke behøver UUID'er i adressefeltet.
+//  * MediaAsset + MediaRendition erstatter den flade Image-tabel, hvor hver størrelse
+//    var en løsrevet række — og hvor kategori-emojis blev gemt som `url = "🍺"`.
+//  * Attributværdier har en ægte diskriminator (`dataType` på definitionen) og et
+//    `valueJson`-felt til MULTI_ENUM i stedet for kun tre nullable kolonner.
+//  * Bløde sletninger (`deletedAt`) på katalogdata, så anmeldelser aldrig bliver forældreløse.
+//  * `updatedAt` overalt; 1.0 havde det kun på Review.
+//  * Refresh-tokens, adgangskode-hashes og rollestyring — 1.0 havde ingen autentificering.
+//  * snake_case tabel- og kolonnenavne via @@map, så SQL-adgang uden for Prisma er behagelig.
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = []
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+/* ------------------------------------------------------------------ */
+/* Enums                                                               */
+/* ------------------------------------------------------------------ */
+
+enum Role {
+  USER
+  MODERATOR
+  ADMIN
+}
+
+enum AttributeDataType {
+  TEXT
+  NUMBER
+  BOOLEAN
+  ENUM
+  MULTI_ENUM
+}
+
+enum QuestionAnswerType {
+  TEXT
+  NUMBER
+  BOOLEAN
+  SCALE
+  SELECT
+  MULTI_SELECT
+}
+
+enum MediaVariant {
+  THUMB
+  CARD
+  FULL
+  AVATAR
+}
+
+enum MediaOwnerType {
+  BEVERAGE
+  BRAND
+  CATEGORY
+  USER
+}
+
+/* ------------------------------------------------------------------ */
+/* Brugere og autentificering                                          */
+/* ------------------------------------------------------------------ */
+
+model User {
+  id           String    @id @default(uuid()) @db.Uuid
+  email        String    @unique
+  displayName  String    @map("display_name")
+  passwordHash String    @map("password_hash")
+  role         Role      @default(USER)
+  active       Boolean   @default(true)
+  /// Bumpes ved adgangskodeskift og deaktivering, så udstedte access-tokens dør med det samme.
+  tokenVersion Int       @default(0) @map("token_version")
+  lastLoginAt  DateTime? @map("last_login_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+  deletedAt    DateTime? @map("deleted_at")
+
+  avatarId      String?        @unique @map("avatar_id") @db.Uuid
+  avatar        MediaAsset?    @relation("UserAvatar", fields: [avatarId], references: [id], onDelete: SetNull)
+  reviews       Review[]
+  refreshTokens RefreshToken[]
+
+  @@index([role])
+  @@index([deletedAt])
+  @@map("users")
+}
+
+/// Rullende refresh-tokens. Kun hashen gemmes; en genbrugt token invaliderer hele familien.
+model RefreshToken {
+  id         String    @id @default(uuid()) @db.Uuid
+  userId     String    @map("user_id") @db.Uuid
+  tokenHash  String    @unique @map("token_hash")
+  /// Alle tokens udstedt fra samme login deler family-id.
+  familyId   String    @map("family_id") @db.Uuid
+  expiresAt  DateTime  @map("expires_at")
+  revokedAt  DateTime? @map("revoked_at")
+  /// Sat når tokenet er byttet til et nyt — gør genbrug detekterbart.
+  rotatedAt  DateTime? @map("rotated_at")
+  userAgent  String?   @map("user_agent")
+  ipAddress  String?   @map("ip_address")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([familyId])
+  @@index([expiresAt])
+  @@map("refresh_tokens")
+}
+
+/* ------------------------------------------------------------------ */
+/* Medier                                                              */
+/* ------------------------------------------------------------------ */
+
+/// Ét logisk billede. Renditions er de konkrete filer i objektlageret (R2).
+model MediaAsset {
+  id        String         @id @default(uuid()) @db.Uuid
+  ownerType MediaOwnerType @map("owner_type")
+  alt       String?
+  /// BlurHash til placeholder mens billedet hentes.
+  blurhash  String?
+  createdAt DateTime       @default(now()) @map("created_at")
+  updatedAt DateTime       @updatedAt @map("updated_at")
+
+  renditions MediaRendition[]
+
+  beverages  Beverage[]         @relation("BeverageMedia")
+  brands     Brand[]            @relation("BrandMedia")
+  categories BeverageCategory[] @relation("CategoryMedia")
+  users      User[]             @relation("UserAvatar")
+
+  @@index([ownerType])
+  @@map("media_assets")
+}
+
+model MediaRendition {
+  id         String       @id @default(uuid()) @db.Uuid
+  assetId    String       @map("asset_id") @db.Uuid
+  variant    MediaVariant
+  /// Nøgle i objektlageret, fx "beverage/2026/01/uuid/card.webp". Bucket kommer fra konfigurationen.
+  storageKey String       @map("storage_key")
+  width      Int
+  height     Int
+  bytes      Int?
+  createdAt  DateTime     @default(now()) @map("created_at")
+
+  asset MediaAsset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@unique([assetId, variant])
+  @@unique([storageKey])
+  @@index([assetId])
+  @@map("media_renditions")
+}
+
+/// Nøgler der har fået en presigned URL, men endnu ikke er knyttet til en entitet.
+/// Oprydningsjobbet sletter dem fra R2 når de udløber.
+model PendingUpload {
+  id         String   @id @default(uuid()) @db.Uuid
+  storageKey String   @unique @map("storage_key")
+  expiresAt  DateTime @map("expires_at")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@index([expiresAt])
+  @@map("pending_uploads")
+}
+
+/* ------------------------------------------------------------------ */
+/* Katalog                                                             */
+/* ------------------------------------------------------------------ */
+
+model BeverageCategory {
+  id          String    @id @default(uuid()) @db.Uuid
+  slug        String    @unique
+  name        String
+  description String?
+  /// Emoji. I 1.0 blev dette misbrugt som en Image-række med emojien i url-feltet.
+  icon        String?
+  accentColor String?   @map("accent_color")
+  sortOrder   Int       @default(0) @map("sort_order")
+  active      Boolean   @default(true)
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  deletedAt   DateTime? @map("deleted_at")
+
+  mediaId String?     @map("media_id") @db.Uuid
+  media   MediaAsset? @relation("CategoryMedia", fields: [mediaId], references: [id], onDelete: SetNull)
+
+  types                BeverageType[]
+  brands               Brand[]               @relation("BrandCategories")
+  attributeDefinitions AttributeDefinition[] @relation("AttributeCategories")
+  questions            Question[]            @relation("QuestionCategories")
+
+  @@index([active, sortOrder])
+  @@index([deletedAt])
+  @@map("beverage_categories")
+}
+
+model BeverageType {
+  id          String    @id @default(uuid()) @db.Uuid
+  slug        String    @unique
+  categoryId  String    @map("category_id") @db.Uuid
+  name        String
+  description String?
+  sortOrder   Int       @default(0) @map("sort_order")
+  active      Boolean   @default(true)
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  deletedAt   DateTime? @map("deleted_at")
+
+  category BeverageCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+
+  beverages            Beverage[]
+  attributeDefinitions AttributeDefinition[] @relation("AttributeTypes")
+  questions            Question[]            @relation("QuestionTypes")
+
+  @@unique([categoryId, name])
+  @@index([categoryId, active, sortOrder])
+  @@index([deletedAt])
+  @@map("beverage_types")
+}
+
+model Brand {
+  id          String    @id @default(uuid()) @db.Uuid
+  slug        String    @unique
+  name        String
+  description String?
+  countryCode String?   @map("country_code") @db.Char(2)
+  websiteUrl  String?   @map("website_url")
+  active      Boolean   @default(true)
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  deletedAt   DateTime? @map("deleted_at")
+
+  mediaId String?     @map("media_id") @db.Uuid
+  media   MediaAsset? @relation("BrandMedia", fields: [mediaId], references: [id], onDelete: SetNull)
+
+  beverages  Beverage[]
+  categories BeverageCategory[] @relation("BrandCategories")
+
+  @@index([active, name])
+  @@index([deletedAt])
+  @@map("brands")
+}
+
+model Beverage {
+  id          String    @id @default(uuid()) @db.Uuid
+  slug        String    @unique
+  name        String
+  description String?
+  countryCode String?   @map("country_code") @db.Char(2)
+  /// Årgang. Relevant for vin og whisky, null for resten.
+  vintage     Int?
+  active      Boolean   @default(true)
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  deletedAt   DateTime? @map("deleted_at")
+
+  typeId  String @map("type_id") @db.Uuid
+  brandId String @map("brand_id") @db.Uuid
+  mediaId String? @map("media_id") @db.Uuid
+
+  type  BeverageType @relation(fields: [typeId], references: [id], onDelete: Restrict)
+  brand Brand        @relation(fields: [brandId], references: [id], onDelete: Restrict)
+  media MediaAsset?  @relation("BeverageMedia", fields: [mediaId], references: [id], onDelete: SetNull)
+
+  /// Denormaliseret for lister og sortering. Genberegnes altid i samme transaktion
+  /// som den anmeldelse der udløste ændringen — se ReviewService.
+  ratingAverage Float @default(0) @map("rating_average")
+  ratingCount   Int   @default(0) @map("rating_count")
+  /// Antal anmeldelser pr. hele stjerne: {"1": 0, "2": 3, ...}
+  ratingBuckets Json  @default("{}") @map("rating_buckets")
+
+  attributeValues BeverageAttributeValue[]
+  reviews         Review[]
+
+  @@unique([brandId, name, vintage])
+  @@index([typeId, active])
+  @@index([brandId])
+  @@index([active, createdAt(sort: Desc)])
+  @@index([active, ratingAverage(sort: Desc)])
+  @@index([deletedAt])
+  @@map("beverages")
+}
+
+/* ------------------------------------------------------------------ */
+/* Dynamiske attributter                                               */
+/* ------------------------------------------------------------------ */
+
+model AttributeDefinition {
+  id          String            @id @default(uuid()) @db.Uuid
+  key         String            @unique
+  displayName String            @map("display_name")
+  description String?
+  dataType    AttributeDataType @map("data_type")
+  /// Enhed vist efter værdien, fx "%" eller "IBU".
+  unit        String?
+  required    Boolean           @default(false)
+  filterable  Boolean           @default(false)
+  /// Vises fremtrædende på drikkevarekort.
+  highlighted Boolean           @default(false)
+  sortOrder   Int               @default(0) @map("sort_order")
+  /// { min, max, step, minLength, maxLength, pattern }
+  rules       Json?
+  /// [{ value, label }] for ENUM og MULTI_ENUM.
+  options     Json?
+  createdAt   DateTime          @default(now()) @map("created_at")
+  updatedAt   DateTime          @updatedAt @map("updated_at")
+  deletedAt   DateTime?         @map("deleted_at")
+
+  /// Tom relation = gælder alle kategorier.
+  categories BeverageCategory[] @relation("AttributeCategories")
+  /// Tom relation = gælder alle typer inden for de valgte kategorier.
+  types      BeverageType[]     @relation("AttributeTypes")
+
+  values BeverageAttributeValue[]
+
+  @@index([filterable])
+  @@index([sortOrder])
+  @@index([deletedAt])
+  @@map("attribute_definitions")
+}
+
+model BeverageAttributeValue {
+  id           String   @id @default(uuid()) @db.Uuid
+  beverageId   String   @map("beverage_id") @db.Uuid
+  definitionId String   @map("definition_id") @db.Uuid
+  /// Præcis ét af value*-felterne er udfyldt, bestemt af definitionens dataType.
+  valueText    String?  @map("value_text")
+  valueNumber  Float?   @map("value_number")
+  valueBoolean Boolean? @map("value_boolean")
+  /// Liste af enum-nøgler ved MULTI_ENUM.
+  valueJson    Json?    @map("value_json")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  beverage   Beverage            @relation(fields: [beverageId], references: [id], onDelete: Cascade)
+  definition AttributeDefinition @relation(fields: [definitionId], references: [id], onDelete: Cascade)
+
+  @@unique([beverageId, definitionId])
+  @@index([beverageId])
+  /// Understøtter facetfiltrering: "alle drikke hvor definition X har værdi Y".
+  @@index([definitionId, valueText])
+  @@index([definitionId, valueNumber])
+  @@index([definitionId, valueBoolean])
+  @@map("beverage_attribute_values")
+}
+
+/* ------------------------------------------------------------------ */
+/* Spørgsmål og anmeldelser                                            */
+/* ------------------------------------------------------------------ */
+
+model Question {
+  id         String             @id @default(uuid()) @db.Uuid
+  prompt     String
+  helpText   String?            @map("help_text")
+  answerType QuestionAnswerType @map("answer_type")
+  required   Boolean            @default(false)
+  sortOrder  Int                @default(0) @map("sort_order")
+  /// [{ value, label }] for SELECT og MULTI_SELECT.
+  options    Json?
+  /// { min, max, minLabel, maxLabel } for SCALE.
+  scale      Json?
+  active     Boolean            @default(true)
+  createdAt  DateTime           @default(now()) @map("created_at")
+  updatedAt  DateTime           @updatedAt @map("updated_at")
+  deletedAt  DateTime?          @map("deleted_at")
+
+  categories BeverageCategory[] @relation("QuestionCategories")
+  types      BeverageType[]     @relation("QuestionTypes")
+
+  answers ReviewAnswer[]
+
+  @@index([active, sortOrder])
+  @@index([deletedAt])
+  @@map("questions")
+}
+
+model Review {
+  id         String    @id @default(uuid()) @db.Uuid
+  userId     String    @map("user_id") @db.Uuid
+  beverageId String    @map("beverage_id") @db.Uuid
+  /// 1-5 i halve trin. Håndhæves af en CHECK-constraint i migreringen.
+  rating     Float
+  title      String?
+  body       String?
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+  deletedAt  DateTime? @map("deleted_at")
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  beverage Beverage @relation(fields: [beverageId], references: [id], onDelete: Cascade)
+  answers  ReviewAnswer[]
+
+  @@unique([userId, beverageId])
+  @@index([beverageId, createdAt(sort: Desc)])
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([deletedAt])
+  @@map("reviews")
+}
+
+model ReviewAnswer {
+  id         String   @id @default(uuid()) @db.Uuid
+  reviewId   String   @map("review_id") @db.Uuid
+  questionId String   @map("question_id") @db.Uuid
+  /// Som ved attributværdier: typen bestemmes af spørgsmålets answerType.
+  valueText    String?  @map("value_text")
+  valueNumber  Float?   @map("value_number")
+  valueBoolean Boolean? @map("value_boolean")
+  valueJson    Json?    @map("value_json")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  review   Review   @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  question Question @relation(fields: [questionId], references: [id], onDelete: Restrict)
+
+  @@unique([reviewId, questionId])
+  @@index([reviewId])
+  @@index([questionId])
+  @@map("review_answers")
+}

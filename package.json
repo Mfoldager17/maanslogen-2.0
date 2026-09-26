@@ -1,0 +1,30 @@
+{
+  "name": "maanslogen",
+  "version": "2.0.0",
+  "private": true,
+  "description": "Maanslogen 2.0 — anmeldelser af drikkevarer med dynamiske attributter og spørgsmål",
+  "packageManager": "pnpm@10.33.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "format": "prettier --write \"**/*.{ts,tsx,js,mjs,json,md,css}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,mjs,json,md,css}\"",
+    "db:migrate": "pnpm --filter @maanslogen/api db:migrate",
+    "db:push": "pnpm --filter @maanslogen/api db:push",
+    "db:seed": "pnpm --filter @maanslogen/api db:seed",
+    "db:studio": "pnpm --filter @maanslogen/api db:studio",
+    "infra:up": "docker compose -f docker/docker-compose.yml up -d",
+    "infra:down": "docker compose -f docker/docker-compose.yml down"
+  },
+  "devDependencies": {
+    "prettier": "^3.6.2",
+    "turbo": "^2.5.8",
+    "typescript": "^5.9.3"
+  }
+}
