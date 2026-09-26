@@ -22,12 +22,12 @@ export function RatingSummaryPanel({ rating }: { rating: RatingSummary }) {
         </p>
       ) : (
         <>
-          <div className="flex items-baseline gap-2.5">
+          <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
             <span className="tabular font-display text-4xl font-bold leading-none text-ink">
               {formatRating(rating.average)}
             </span>
-            <span className="label-mono">/ 5</span>
-            <span className="label-mono ml-auto">
+            <span className="label-mono whitespace-nowrap">/ 5</span>
+            <span className="label-mono w-full whitespace-nowrap sm:w-auto">
               {formatCount(rating.count)} {rating.count === 1 ? "anmeldelse" : "anmeldelser"}
             </span>
           </div>

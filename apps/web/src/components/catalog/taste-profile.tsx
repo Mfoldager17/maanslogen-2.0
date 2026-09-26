@@ -11,7 +11,13 @@ import { formatCount, formatNumber } from "@/lib/format";
  * Måleværdier står i signalfarven, aldrig i accent. Accent er til handlinger
  * og bedømmelser; det her er aflæsninger.
  */
-export function TasteProfilePanel({ profile }: { profile: TasteProfile }) {
+export function TasteProfilePanel({
+  profile,
+  className,
+}: {
+  profile: TasteProfile;
+  className?: string;
+}) {
   if (profile.entries.length === 0) return null;
 
   const skalaer = profile.entries.filter(
@@ -26,7 +32,8 @@ export function TasteProfilePanel({ profile }: { profile: TasteProfile }) {
     <Panel
       title="Smagsprofil"
       tone="signal"
-      meta={`${formatCount(profile.reviewCount)} ${profile.reviewCount === 1 ? "svar" : "svar"}`}
+      meta={`${formatCount(profile.reviewCount)} svar`}
+      className={className}
     >
       <div className="flex flex-col gap-6">
         {skalaer.length > 0 ? (

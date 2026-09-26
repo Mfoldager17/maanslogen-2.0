@@ -52,10 +52,10 @@ export function ReviewList({ reviews }: { reviews: Review[] }) {
                 {review.answers.map((answer) => (
                   <li
                     key={answer.questionId}
-                    className="rounded-md bg-sunken px-2.5 py-1 text-xs text-ink-soft"
+                    className="max-w-full truncate rounded-md bg-sunken px-2.5 py-1 text-xs text-ink-soft"
                     title={answer.prompt}
                   >
-                    {shortPrompt(answer.prompt)}{" "}
+                    {answer.prompt.replace(/\?$/, "")}{" "}
                     <strong className="font-semibold text-ink">{answer.displayValue}</strong>
                   </li>
                 ))}
@@ -66,11 +66,4 @@ export function ReviewList({ reviews }: { reviews: Review[] }) {
       ))}
     </ul>
   );
-}
-
-/** "Hvor bitter er den?" → "Bitter" — chippen skal kunne læses i ét blik. */
-function shortPrompt(prompt: string): string {
-  const cleaned = prompt.replace(/\?$/, "").replace(/^(hvor|hvilke[nt]?|ville du|hvad)\s+/i, "");
-  const words = cleaned.split(/\s+/).slice(0, 2).join(" ");
-  return words.charAt(0).toUpperCase() + words.slice(1);
 }

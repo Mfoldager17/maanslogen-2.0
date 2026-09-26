@@ -152,7 +152,11 @@ export default async function BeveragePage({ params }: Params) {
          * `profile ? …` alene efterlod en tom 20rem-spalte ved siden af en
          * sammenklemt anmeldelsesliste.
          */}
-        {profile && profile.entries.length > 0 ? <TasteProfilePanel profile={profile} /> : <div />}
+        {profile && profile.entries.length > 0 ? (
+          <TasteProfilePanel profile={profile} className="self-start" />
+        ) : (
+          <div />
+        )}
 
         <section aria-labelledby="anmeldelser" className="min-w-0">
           <h2 id="anmeldelser" className="mb-4 font-display text-xl font-semibold">

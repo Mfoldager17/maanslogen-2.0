@@ -70,12 +70,16 @@ export function MeterRow({
   className?: string;
 }) {
   return (
-    <div className={cn("flex items-center gap-3", className)}>
-      <span className="label-mono w-28 shrink-0 truncate" title={label}>
-        {label}
-      </span>
-      <Meter value={value} max={max} tone={tone} className="min-w-0 flex-1" />
-      <span className="tabular w-24 shrink-0 text-right font-mono text-xs text-ink">{display}</span>
+    <div className={cn("flex flex-col gap-1.5", className)}>
+      <div className="flex items-baseline justify-between gap-3">
+        <span className="label-mono min-w-0 truncate" title={label}>
+          {label}
+        </span>
+        <span className="tabular shrink-0 whitespace-nowrap font-mono text-xs text-ink">
+          {display}
+        </span>
+      </div>
+      <Meter value={value} max={max} tone={tone} />
     </div>
   );
 }

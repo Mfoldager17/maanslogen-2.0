@@ -22,7 +22,7 @@ export function SortSelect() {
 
   return (
     <div className="flex items-center gap-2">
-      <label htmlFor={id} className="text-sm text-ink-muted">
+      <label htmlFor={id} className="label-mono shrink-0">
         Sortér
       </label>
       <select
@@ -40,7 +40,8 @@ export function SortSelect() {
             ),
           );
         }}
-        className="h-10 rounded-[var(--radius-control)] border border-line-strong bg-surface px-2.5 text-sm"
+        // Samme højde og baggrund som alle andre kontroller (se field.tsx).
+        className="h-11 min-w-0 rounded-[var(--radius-control)] border border-line-strong bg-canvas px-2.5 text-sm text-ink"
       >
         {OPTIONS.map((option) => (
           <option key={option.value} value={option.value}>
