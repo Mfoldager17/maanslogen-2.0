@@ -9,7 +9,7 @@ GitHub-hosted runner (ubuntu-24.04-arm, gratis på offentligt repo)
    ▼
 GHCR  ghcr.io/mfoldager17/maanslogen-api:{main,pr-42}
    │
-   │   Pi'en spørger hvert femte minut:
+   │   GitHub ringer på (webhook), og agenten spørger:
    │     · hvilke åbne PR'er har label "preview"?
    │     · er der et nyt :main-image?
    ▼
@@ -37,6 +37,25 @@ capabilities, ingen rettighedsforfremmelse, loft på hukommelse og processer,
 og den ligger på `maanslogen-dev`-netværket, hvor produktions-API'et ikke er.
 Databasen nås med rollen `maanslogen_dev`, som ikke har CONNECT på
 produktionsdatabasen.
+
+## Webhooken
+
+GitHub sender en besked til `deploy.<domæne>` hver gang et workflow er kørt
+færdigt. Modtageren vækker agenten, og så er udrulningen i gang efter et par
+sekunder i stedet for op til en halv time.
+
+**Beskeden er kun en dørklokke.** Modtageren læser ikke indholdet og stoler
+ikke på det — den kører agenten, som selv spørger GitHub hvad der bør køre.
+En forfalsket besked kan derfor ikke udrette andet end en ekstra kørsel af
+noget, der i forvejen er idempotent. Signaturen tjekkes alligevel, så fremmede
+ikke kan holde Pi'en i gang.
+
+Timeren bliver stående som sikkerhedsnet: webhooks bliver væk, og uden den
+ville en tabt besked betyde at en udrulning aldrig landede.
+
+Agenten kan nu kaldes to steder fra, så den tager en lås (`flock -n`). Kører
+der allerede en, går den anden pænt hjem med exitkode 75 i stedet for at rode
+i den førstes arbejde.
 
 ## Installation
 

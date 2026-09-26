@@ -109,6 +109,11 @@ services:
     environment:
       PROD_API_HOST: ${PROD_API_HOST}
       DEV_API_HOST: ${DEV_API_HOST}
+      DEPLOY_HOST: ${DEPLOY_HOST}
+    # Webhook-modtageren kører på værten, ikke i en container. Uden dette
+    # findes navnet host.docker.internal ikke på Linux.
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
     volumes:
       - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy-data:/data

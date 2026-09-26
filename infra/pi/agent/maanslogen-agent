@@ -19,6 +19,22 @@
 
 set -euo pipefail
 
+# Agenten kaldes nu to steder fra: timeren og webhook-modtageren. Uden en lås
+# kunne de to ramme hinanden midt i en genstart af produktionen.
+#
+# `flock -n` betyder: kører der allerede en, så lad være — den er i gang med
+# præcis det arbejde vi selv skulle til at lave. Låsen ligger i systemd's
+# StateDirectory, så begge tjenester ser den samme fil.
+#
+# `-E 75` giver "kører allerede" sin egen exitkode (EX_TEMPFAIL). Det er ikke
+# en fejl, og både unit-filen og webhook-modtageren behandler den som succes —
+# ellers ville hver overlappende webhook se ud som et nedbrud i loggen.
+: "${MAANSLOGEN_LAAS:=/var/lib/maanslogen/agent.lock}"
+if [ -z "${MAANSLOGEN_LAAST:-}" ]; then
+  mkdir -p "$(dirname "$MAANSLOGEN_LAAS")"
+  exec env MAANSLOGEN_LAAST=1 flock -n -E 75 "$MAANSLOGEN_LAAS" "$0" "$@"
+fi
+
 cd "$(dirname "$0")/.."
 # shellcheck source=infra/pi/load-env.sh
 . ./load-env.sh

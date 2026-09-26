@@ -1,22 +1,23 @@
 [Unit]
-Description=Kør maanslogen-agent hvert femte minut
+Description=Sikkerhedsnet under webhooken — kør agenten hver halve time
 
 [Timer]
 OnBootSec=2min
 
-# Hvert femte minut, og det er valgt ud fra GitHubs grænse.
+# Til daglig er det webhooken der driver det: GitHub ringer på, og agenten
+# kører med det samme. Timeren her er sikkerhedsnettet.
 #
-# Uden et token er grænsen 60 API-kald i timen PR. IP-ADRESSE — altså delt med
-# alt andet på dit netværk, også din egen maskine. Ved to minutter brugte
-# agenten alene 30 af dem, altså halvdelen. Ved fem minutter er det 12.
+# Den findes fordi webhooks bliver væk — Pi'en genstarter, netværket blinker,
+# GitHub giver op efter ti sekunder. Uden den ville en tabt besked betyde at
+# en udrulning aldrig landede, og ingen ville opdage det.
 #
-# Har du sat et skrivebeskyttet GITHUB_TOKEN i /etc/maanslogen/pi.env, er
-# grænsen 5.000 i timen, og så kan du roligt gå ned til 1min.
+# En halv time er rigeligt til den rolle, og det holder forbruget nede på to
+# API-kald i timen mod GitHubs grænse på 60 uden token.
 #
-# Venter du på en udrulning, så behøver du ikke vente på timeren:
+# Vil du ikke vente:
 #   sudo systemctl start maanslogen-agent
-OnUnitActiveSec=5min
-AccuracySec=30s
+OnUnitActiveSec=30min
+AccuracySec=2min
 
 [Install]
 WantedBy=timers.target

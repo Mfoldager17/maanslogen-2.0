@@ -1,0 +1,27 @@
+[Unit]
+Description=Tager imod GitHub-webhooks og vækker agenten
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+ExecStart=/opt/maanslogen/infra/pi/agent/webhook-modtager
+Restart=always
+RestartSec=5
+
+# Samme bruger som agenten, og samme StateDirectory — det er dér låsen ligger,
+# så de to ikke kan køre oven i hinanden.
+User=maanslogen
+Group=docker
+StateDirectory=maanslogen
+
+# WEBHOOK_SECRET læses herfra. Samme fil som resten af hemmelighederne.
+EnvironmentFile=/etc/maanslogen/pi.env
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/run/docker.sock /opt/maanslogen
+
+[Install]
+WantedBy=multi-user.target

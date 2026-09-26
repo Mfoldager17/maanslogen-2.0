@@ -1,0 +1,97 @@
+#!/usr/bin/env python3
+"""GitHub-webhook der vækker agenten.
+
+Det afgørende er hvad den IKKE gør: den læser ikke beskedens indhold og
+stoler ikke på det. Den kører agenten, som selv spørger GitHub hvad der bør
+køre — præcis som når timeren udløser den.
+
+Derfor er en forfalsket besked harmløs. Det værste den kan udrette er en
+ekstra kørsel af noget, der i forvejen er idempotent. Havde modtageren taget
+imod ordrer i beskeden, havde det været en helt anden sag.
+
+Signaturen tjekkes alligevel, så fremmede ikke kan holde Pi'en i gang.
+
+Kører som en systemd-tjeneste på værten. Caddy sender den trafik fra
+deploy.<domæne> gennem tunnelen.
+"""
+
+import hashlib
+import hmac
+import os
+import subprocess
+import sys
+import threading
+from http.server import BaseHTTPRequestHandler, HTTPServer
+
+HEMMELIGHED = os.environ.get("WEBHOOK_SECRET", "").encode()
+AGENT = os.environ.get("AGENT_STI", "/opt/maanslogen/infra/pi/agent/maanslogen-agent")
+PORT = int(os.environ.get("WEBHOOK_PORT", "9876"))
+# Caddy kører i en container og når os over docker-broen, så vi kan ikke nøjes
+# med 127.0.0.1. Porten er dermed også åben på dit lokalnet — signaturen er
+# det der beskytter den. Vil du snævre ind, så sæt WEBHOOK_BIND til broens
+# gateway-adresse (`docker network inspect maanslogen`).
+BIND = os.environ.get("WEBHOOK_BIND", "0.0.0.0")
+
+# Større beskeder end det her er ikke noget vi har brug for at læse. Grænsen
+# findes for at en meget stor POST ikke kan æde hukommelsen.
+MAKS_KROP = 1024 * 1024
+
+if not HEMMELIGHED:
+    sys.exit("WEBHOOK_SECRET mangler")
+
+
+def log(*dele: object) -> None:
+    print(*dele, flush=True)
+
+
+def koer_agenten() -> None:
+    try:
+        resultat = subprocess.run([AGENT], capture_output=True, text=True, timeout=900)
+    except subprocess.TimeoutExpired:
+        log("agenten nåede ikke at blive færdig inden for 15 minutter")
+        return
+    if resultat.returncode == 75:
+        log("agenten kørte allerede — sprunget over")
+    elif resultat.returncode != 0:
+        log(f"agenten fejlede ({resultat.returncode}): {resultat.stderr.strip()[:500]}")
+    else:
+        log("agenten kørte færdig")
+
+
+class Modtager(BaseHTTPRequestHandler):
+    def do_POST(self) -> None:  # noqa: N802 — navnet er BaseHTTPRequestHandlers
+        if self.path != "/github":
+            return self._svar(404)
+
+        laengde = int(self.headers.get("Content-Length") or 0)
+        if laengde > MAKS_KROP:
+            return self._svar(413)
+        krop = self.rfile.read(laengde)
+
+        signatur = self.headers.get("X-Hub-Signature-256", "")
+        forventet = "sha256=" + hmac.new(HEMMELIGHED, krop, hashlib.sha256).hexdigest()
+        # compare_digest og ikke ==, så svartiden ikke røber hvor langt man kom.
+        if not hmac.compare_digest(signatur, forventet):
+            log("afvist: forkert signatur")
+            return self._svar(401)
+
+        haendelse = self.headers.get("X-GitHub-Event", "?")
+        log(f"vækket af {haendelse}")
+
+        # Svar med det samme. GitHub giver op efter ti sekunder, og agenten kan
+        # sagtens bruge længere tid på at hente et image og migrere.
+        self._svar(204)
+        threading.Thread(target=koer_agenten, daemon=True).start()
+
+    def _svar(self, kode: int) -> None:
+        self.send_response(kode)
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+
+    def log_message(self, *_: object) -> None:
+        """Standardloggeren skriver en linje pr. forespørgsel. Vi logger selv."""
+
+
+if __name__ == "__main__":
+    log(f"lytter på {BIND}:{PORT}")
+    HTTPServer((BIND, PORT), Modtager).serve_forever()

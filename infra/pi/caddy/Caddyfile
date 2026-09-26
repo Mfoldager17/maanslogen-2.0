@@ -37,6 +37,13 @@
 		}
 	}
 
+	# GitHub-webhooks. Modtageren kører på værten og ikke i en container,
+	# fordi den skal kunne starte agenten — derfor host.docker.internal.
+	@deploy host {$DEPLOY_HOST}
+	handle @deploy {
+		reverse_proxy host.docker.internal:9876
+	}
+
 	# Alt andet: tunnelen sender os hele trafikken, så et ukendt værtsnavn
 	# skal ikke ramme noget.
 	handle {

@@ -20,10 +20,11 @@ ubuntu-24.04-arm                Workers (web)          Postgres
        └───────────────────────────────────────────►  maanslogen-agent
 ```
 
-**Intet skubber til Pi'en.** Der er ingen selvhostet GitHub-runner. Pi'en
-spørger selv og udfører kun `docker pull` og `docker run` med argumenter, den
-selv bestemmer ud fra kode der ligger på `main`. Se
-[`infra/pi/agent/`](../infra/pi/agent/).
+**Ingen ordrer når ind til Pi'en.** Der er ingen selvhostet GitHub-runner.
+GitHub ringer på med en webhook, men den er kun en dørklokke: agenten læser
+ikke beskeden, den spørger GitHub selv og udfører kun `docker pull` og
+`docker run` med argumenter, den selv bestemmer ud fra kode der ligger på
+`main`. Se [`infra/pi/agent/`](../infra/pi/agent/).
 
 |          | Produktion              | Dev                                        |
 | -------- | ----------------------- | ------------------------------------------ |
@@ -257,7 +258,56 @@ sudo systemctl start maanslogen-agent    # kør med det samme
 > **shell på værten**, med adgang til hemmelighedsfilen og docker-socket — og
 > docker-socket er reelt root. En container er en helt almindelig sandkasse.
 
-### 5. Hemmeligheder, variabler og label i GitHub
+### 5. Webhooken, så du ikke skal vente
+
+Uden den opdager Pi'en først en udrulning ved næste timer-kørsel, altså op til
+en halv time senere. Med den er der gået et par sekunder.
+
+På Pi'en:
+
+```bash
+# Læg hemmeligheden i samme fil som resten
+echo "WEBHOOK_SECRET=$(openssl rand -hex 32)" | sudo tee -a /etc/maanslogen/pi.env
+echo "DEPLOY_HOST=deploy.maanslogen.dk" | sudo tee -a /etc/maanslogen/pi.env
+
+sudo cp /opt/maanslogen/infra/pi/agent/maanslogen-webhook.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now maanslogen-webhook
+sudo docker compose --env-file /etc/maanslogen/pi.env up -d caddy   # ny rute
+```
+
+DNS for `deploy.<domæne>` oprettes som de øvrige:
+
+```bash
+CF_API_TOKEN=... CF_ZONE_ID=... CF_TUNNEL_ID=... \
+  infra/scripts/dns-record.sh upsert deploy.maanslogen.dk
+```
+
+I GitHub: _Settings → Webhooks → Add webhook_
+
+| Felt         | Værdi                                                     |
+| ------------ | --------------------------------------------------------- |
+| Payload URL  | `https://deploy.maanslogen.dk/github`                     |
+| Content type | `application/json`                                        |
+| Secret       | den samme streng som `WEBHOOK_SECRET`                     |
+| Events       | _Let me select individual events_ → kun **Workflow runs** |
+
+`workflow_run` er nok til det hele. Den fyrer når `Udrul` er færdig med at
+lægge et `:main`-image op, og når `Preview` er færdig med et `:pr-<n>` — og
+også når oprydningen har kørt. Ét hændelsestype dækker både udrulning,
+oprettelse og nedrivning.
+
+> **Hvorfor det er forsvarligt at have en endpoint ind mod hjemmet.**
+> Beskeden er kun en dørklokke. Modtageren læser ikke indholdet, den vækker
+> bare agenten, som selv spørger GitHub hvad der bør køre. En forfalsket
+> besked kan derfor ikke udrette andet end en ekstra kørsel af noget
+> idempotent. Signaturen (HMAC-SHA256) tjekkes alligevel, så fremmede ikke kan
+> holde Pi'en i gang, og modtageren kan i det hele taget kun gøre én ting.
+>
+> Vil du stramme yderligere, kan du på Cloudflare afvise alt der ikke kommer
+> fra GitHubs IP-intervaller, før det overhovedet når tunnelen.
+
+### 6. Hemmeligheder, variabler og label i GitHub
 
 Opret først label'en **`preview`** under _Issues → Labels_. Den er porten til
 et preview-miljø; uden den sker der ingenting, når du sætter den på et PR.
@@ -284,7 +334,7 @@ Variables:
 | `PROD_MEDIA_HOST`   | `media.maanslogen.dk`     |
 | `DEV_MEDIA_HOST`    | `media.dev.maanslogen.dk` |
 
-### 6. Første udrulning
+### 7. Første udrulning
 
 ```bash
 cd apps/web

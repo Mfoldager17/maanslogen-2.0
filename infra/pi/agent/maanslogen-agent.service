@@ -6,6 +6,12 @@ Requires=docker.service
 [Service]
 Type=oneshot
 
+# /var/lib/maanslogen — her ligger låsen, som webhook-modtageren deler med os.
+StateDirectory=maanslogen
+
+# 75 betyder "en anden kørsel er allerede i gang". Det er ikke en fejl.
+SuccessExitStatus=75
+
 # Hent nyeste infra/ først. Uden dette kunne klonen sakke bagud, og så ville
 # agenten køre gammel kode — netop den egenskab ("agenten kører main's kode")
 # som sikkerheden hviler på, ville stille og roligt holde op med at passe.
