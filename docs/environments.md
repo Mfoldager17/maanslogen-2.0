@@ -76,16 +76,17 @@ står nedenfor, og den er værd at kende.
 Én gang. Regn med en times tid.
 
 **Rækkefølgen betyder noget.** Pi'ens containere hentes fra GHCR, så imaget
-skal findes, før Pi'en kan komme op. Kort sagt:
+skal findes, før Pi'en kan komme op.
 
-|     |                               |                                           |
-| --- | ----------------------------- | ----------------------------------------- |
-| 1   | Cloudflare                    | token, buckets, tunnel, DNS               |
-| 2   | GitHub                        | hemmeligheder, variabler, `preview`-label |
-| 3   | Push til `main`               | bygger imaget og lægger det i GHCR        |
-| 4   | **Gør GHCR-pakken offentlig** | ellers kan Pi'en ikke hente den           |
-| 5   | Pi'en                         | `.env`, `compose up`, agent, seed         |
-| 6   | Første `wrangler deploy`      | så Worker'en findes                       |
+|     |                                                   |                                           |
+| --- | ------------------------------------------------- | ----------------------------------------- |
+| 1   | Cloudflare                                        | token, buckets, tunnel, DNS               |
+| 2   | Push til `main`, og **gør GHCR-pakken offentlig** | ellers kan Pi'en ikke hente imaget        |
+| 3   | Pi'en                                             | klon, `.env`, `compose up`, skema og seed |
+| 4   | Agenten                                           | systemd-tjenesten der henter fra GHCR     |
+| 5   | Webhooken                                         | så du slipper for at vente på timeren     |
+| 6   | GitHub                                            | hemmeligheder, variabler, `preview`-label |
+| 7   | Første `wrangler deploy`                          | så Worker'en findes                       |
 
 ### 1. Cloudflare
 
@@ -137,72 +138,12 @@ Koden er offentlig i forvejen, så imaget afslører ikke noget nyt.
 
 ### 3. Pi'en
 
-```bash
-git clone https://github.com/Mfoldager17/maanslogen-2.0 ~/maanslogen
+Appen kommer fra GHCR. Men `Caddyfile` og `init-dev-db.sh` **bind-mountes** ind
+i containerne og skal derfor være rigtige filer på værtens disk,
+`docker-compose.yml` læses fra disken, og agenten kører på værten — det er jo
+den der styrer docker.
 
-# Hemmelighederne ligger ét fast sted uden for ethvert checkout. Grunden er
-# GitHub-runneren: den tjekker repoet ud i sit eget arbejdsbibliotek, og .env
-# er git-ignoreret, så der ville filen aldrig være.
-sudo mkdir -p /etc/maanslogen
-sudo cp ~/maanslogen/infra/pi/.env.example /etc/maanslogen/pi.env
-sudo chown "$USER" /etc/maanslogen/pi.env
-sudo chmod 600 /etc/maanslogen/pi.env
-```
-
-Udfyld `/etc/maanslogen/pi.env`. Hemmelighederne genereres med `openssl rand -base64 48`. Prod
-og dev skal have **hvert sit** sæt JWT-nøgler, så et token fra et preview ikke
-virker i produktion. `CLOUDFLARE_TUNNEL_TOKEN` kommer fra
-`terraform output -raw tunnel_token`.
-
-```bash
-cd ~/maanslogen/infra/pi
-docker compose --env-file /etc/maanslogen/pi.env up -d
-```
-
-Scripts og workflows finder selv filen: `MAANSLOGEN_ENV_FILE` hvis den er sat,
-ellers `/etc/maanslogen/pi.env`, ellers en `.env` ved siden af
-`docker-compose.yml`. Findes ingen af dem, siger de fra med det samme frem for
-at køre videre med tomme variabler.
-
-Første gang oprettes begge databaser. Byg imaget og få skema og testdata på
-plads:
-
-```bash
-cd ~/maanslogen
-docker build -f apps/api/Dockerfile -t maanslogen-api:latest .
-docker tag maanslogen-api:latest maanslogen-api:dev
-
-. infra/pi/load-env.sh
-
-# Produktionen migreres med den rolle der ejer den.
-docker run --rm --network maanslogen \
-  -e DATABASE_URL="postgresql://$POSTGRES_USER:$POSTGRES_PASSWORD@postgres:5432/maanslogen?schema=public" \
-  maanslogen-api:latest ./node_modules/.bin/prisma migrate deploy
-
-# Dev har sin egen rolle, som ikke kan forbinde til produktionen.
-dev_url="postgresql://maanslogen_dev:$DEV_POSTGRES_PASSWORD@postgres:5432/maanslogen_dev?schema=public"
-docker run --rm --network maanslogen -e DATABASE_URL="$dev_url" \
-  maanslogen-api:dev ./node_modules/.bin/prisma migrate deploy
-
-# Kun dev får testdata. Produktionen starter tom.
-docker run --rm --network maanslogen -e DATABASE_URL="$dev_url" \
-  maanslogen-api:dev ./node_modules/.bin/prisma db seed
-```
-
-### 4. Agenten på Pi'en
-
-Pi'en skal kunne starte containere ud fra det GitHub siger. Det gøres **ikke**
-med en selvhostet runner: den ville få tilsendt workflow-kode og udføre den
-som en shell på maskinen, og på et offentligt repo kan enhver åbne et PR.
-
-I stedet spørger Pi'en selv.
-
-Selve appen kommer fra GHCR. Men tre ting kan ikke komme fra et image:
-`Caddyfile` og `init-dev-db.sh` **bind-mountes** ind i containere og skal
-derfor være rigtige filer på værtens disk, `docker-compose.yml` læses fra
-disken, og agenten kører på værten — det er jo den der styrer docker.
-
-Det er 128 KB, ikke hele repoet. Derfor en sparse checkout:
+Det er 128 KB, ikke hele repoet, så klonen er sparse:
 
 ```bash
 sudo useradd -r -G docker -s /usr/sbin/nologin maanslogen
@@ -213,22 +154,82 @@ cd /opt/maanslogen
 sudo git sparse-checkout set --no-cone infra/pi
 sudo git checkout
 sudo chown -R maanslogen /opt/maanslogen      # agenten skal kunne pulle
-
-sudo cp infra/pi/agent/maanslogen-agent.{service,timer} /etc/systemd/system/
-sudo systemctl daemon-reload
-sudo systemctl enable --now maanslogen-agent.timer
 ```
 
 Det giver 11 filer og 344 KB i alt.
 
-Klonen holder sig selv opdateret: `maanslogen-agent.service` kører
-`git pull --ff-only` som `ExecStartPre`, altså før hver kørsel. Det er ikke
-bekvemmelighed — hele sikkerhedsargumentet er at _agenten kører main's kode_,
-og en klon der sakkede bagud ville gøre den påstand usand uden at sige det.
+Hemmelighederne ligger uden for klonen, så en `git pull` aldrig kan røre dem:
+
+```bash
+sudo mkdir -p /etc/maanslogen
+sudo cp /opt/maanslogen/infra/pi/.env.example /etc/maanslogen/pi.env
+sudo chown maanslogen /etc/maanslogen/pi.env
+sudo chmod 600 /etc/maanslogen/pi.env
+```
+
+Udfyld filen. Hemmeligheder genereres med `openssl rand -base64 48`, og prod og
+dev skal have **hvert sit** sæt JWT-nøgler, så et token fra et preview ikke
+virker i produktion. `CLOUDFLARE_TUNNEL_TOKEN` kommer fra
+`terraform output -raw tunnel_token`.
+
+Scripts finder selv filen: `MAANSLOGEN_ENV_FILE` hvis den er sat, ellers
+`/etc/maanslogen/pi.env`, ellers en `.env` ved siden af `docker-compose.yml`.
+Findes ingen af dem, siger de fra med det samme frem for at køre videre med
+tomme variabler.
+
+Så op med det hele:
+
+```bash
+cd /opt/maanslogen/infra/pi
+sudo docker compose --env-file /etc/maanslogen/pi.env up -d
+```
+
+Første gang volumen er tom, opretter Postgres begge databaser og rollen
+`maanslogen_dev`. Imaget hentes fra GHCR — det bygges **ikke** her, og derfor
+skal pakken være offentlig (trin 2).
+
+Til sidst skema og testdata:
+
+```bash
+cd /opt/maanslogen/infra/pi
+. ./load-env.sh
+image="${GHCR_IMAGE:-ghcr.io/mfoldager17/maanslogen-api}:main"
+
+# Produktionen — egen rolle, eget netværk. Starter tom, uden testdata.
+sudo docker run --rm --network maanslogen \
+  -e DATABASE_URL="postgresql://$POSTGRES_USER:$POSTGRES_PASSWORD@postgres:5432/maanslogen?schema=public" \
+  "$image" ./node_modules/.bin/prisma migrate deploy
+
+# Dev — rollen maanslogen_dev, og netværket maanslogen-dev.
+dev_url="postgresql://maanslogen_dev:$DEV_POSTGRES_PASSWORD@postgres:5432/maanslogen_dev?schema=public"
+sudo docker run --rm --network maanslogen-dev -e DATABASE_URL="$dev_url" \
+  "$image" ./node_modules/.bin/prisma migrate deploy
+sudo docker run --rm --network maanslogen-dev -e DATABASE_URL="$dev_url" \
+  "$image" ./node_modules/.bin/prisma db seed
+```
+
+### 4. Agenten på Pi'en
+
+Pi'en skal kunne starte containere ud fra det GitHub siger. Det gøres **ikke**
+med en selvhostet runner: den ville få tilsendt workflow-kode og udføre den som
+en shell på maskinen, og på et offentligt repo kan enhver åbne et PR.
+
+Klonen og brugeren er på plads fra trin 3, så der mangler kun tjenesten:
+
+```bash
+sudo cp /opt/maanslogen/infra/pi/agent/maanslogen-agent.{service,timer} /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now maanslogen-agent.timer
+```
+
+Klonen holder sig selv opdateret: unit-filen kører `git pull --ff-only` som
+`ExecStartPre`, altså før hver kørsel. Det er ikke bekvemmelighed — hele
+sikkerhedsargumentet er at _agenten kører main's kode_, og en klon der sakkede
+bagud ville gøre den påstand usand uden at sige det.
 
 Pull'et ligger i et selvstændigt trin og ikke inde i agenten, fordi bash læser
-et script løbende under kørslen: et script der skriver sig selv om undervejs
-kan ende med at udføre noget sludder.
+et script løbende under kørslen: et script der skriver sig selv om undervejs kan
+ende med at udføre noget sludder.
 
 Følg med:
 
@@ -541,4 +542,4 @@ indeholde præcis den adresse browseren kommer fra. Cookies sættes med
 virker det ikke over ren HTTP.
 
 **`wrangler versions upload` siger at Worker'en ikke findes.** Den skal
-udrulles én gang i hånden først, se trin 5.
+udrulles én gang i hånden først, se trin 7.
