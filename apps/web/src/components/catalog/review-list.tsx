@@ -14,10 +14,14 @@ export function ReviewList({ reviews }: { reviews: Review[] }) {
   }
 
   return (
-    <ul className="flex flex-col gap-4">
+    // `min-w-0` hele vejen ned: `break-words` lader en lang URL brydes, men
+    // flytter ikke min-content. Uden det sætter URL'en gitterets spor til sin
+    // egen ubrudte bredde — målt til 490px i et 358px gitter — og hele siden
+    // kunne scrolles vandret.
+    <ul className="flex min-w-0 flex-col gap-4">
       {reviews.map((review) => (
-        <li key={review.id}>
-          <article className="rounded-[var(--radius-card)] border border-line bg-surface p-5">
+        <li key={review.id} className="min-w-0">
+          <article className="min-w-0 rounded-[var(--radius-card)] border border-line bg-surface p-5">
             <header className="mb-3 flex items-center gap-3">
               <span
                 className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent text-xs font-semibold text-on-accent"
