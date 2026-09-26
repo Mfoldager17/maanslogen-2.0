@@ -13,8 +13,8 @@
 set -euo pipefail
 
 cd "$(dirname "$0")"
-[[ -f .env ]] || { echo "infra/pi/.env mangler" >&2; exit 1; }
-set -a; . ./.env; set +a
+# shellcheck source=infra/pi/load-env.sh
+. ./load-env.sh
 
 action=${1:?brug: preview.sh up|down <pr-nummer> [web-origin]}
 pr=${2:?mangler PR-nummer}

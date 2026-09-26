@@ -32,7 +32,7 @@ jobs:
       - name: Migrér produktionsdatabasen
         working-directory: infra/pi
         run: |
-          set -a; . ./.env; set +a
+          . ./load-env.sh
           docker run --rm --network maanslogen \
             -e DATABASE_URL="postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/maanslogen?schema=public" \
             maanslogen-api:${{ github.sha }} ./node_modules/.bin/prisma migrate deploy
@@ -40,26 +40,37 @@ jobs:
       - name: Migrér dev-databasen
         working-directory: infra/pi
         run: |
-          set -a; . ./.env; set +a
+          . ./load-env.sh
           docker run --rm --network maanslogen \
             -e DATABASE_URL="postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/maanslogen_dev?schema=public" \
             maanslogen-api:${{ github.sha }} ./node_modules/.bin/prisma migrate deploy
 
       - name: Genstart API'erne
         working-directory: infra/pi
-        run: docker compose --env-file .env up -d --force-recreate api api-dev
+        run: docker compose --env-file "$MAANSLOGEN_ENV_FILE" up -d --force-recreate api api-dev
 
       - name: Tjek at de svarer
         working-directory: infra/pi
         run: |
+          . ./load-env.sh
           for tjeneste in api api-dev; do
+            klar=nej
             for _ in $(seq 1 30); do
-              if docker compose exec -T "$tjeneste" node -e \
+              if docker compose --env-file "$MAANSLOGEN_ENV_FILE" exec -T "$tjeneste" node -e \
                   "fetch('http://127.0.0.1:4000/api/v1/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))" 2>/dev/null; then
-                echo "$tjeneste er klar"; break
+                klar=ja; break
               fi
               sleep 2
             done
+            # Uden dette faldt løkken bare igennem, og trinnet blev grønt selv
+            # når tjenesten aldrig kom op. En udrulning der ikke virker skal
+            # sige fra, ikke melde succes.
+            if [ "$klar" = nej ]; then
+              echo "$tjeneste blev aldrig klar" >&2
+              docker compose --env-file "$MAANSLOGEN_ENV_FILE" logs --tail 50 "$tjeneste" >&2
+              exit 1
+            fi
+            echo "$tjeneste er klar"
           done
 
   web:

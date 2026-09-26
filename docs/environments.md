@@ -111,18 +111,30 @@ Bagefter, i hånden i dashboardet:
 
 ```bash
 git clone https://github.com/Mfoldager17/maanslogen-2.0 ~/maanslogen
-cd ~/maanslogen/infra/pi
-cp .env.example .env
+
+# Hemmelighederne ligger ét fast sted uden for ethvert checkout. Grunden er
+# GitHub-runneren: den tjekker repoet ud i sit eget arbejdsbibliotek, og .env
+# er git-ignoreret, så der ville filen aldrig være.
+sudo mkdir -p /etc/maanslogen
+sudo cp ~/maanslogen/infra/pi/.env.example /etc/maanslogen/pi.env
+sudo chown "$USER" /etc/maanslogen/pi.env
+sudo chmod 600 /etc/maanslogen/pi.env
 ```
 
-Udfyld `.env`. Hemmelighederne genereres med `openssl rand -base64 48`. Prod
+Udfyld `/etc/maanslogen/pi.env`. Hemmelighederne genereres med `openssl rand -base64 48`. Prod
 og dev skal have **hvert sit** sæt JWT-nøgler, så et token fra et preview ikke
 virker i produktion. `CLOUDFLARE_TUNNEL_TOKEN` kommer fra
 `terraform output -raw tunnel_token`.
 
 ```bash
-docker compose --env-file .env up -d
+cd ~/maanslogen/infra/pi
+docker compose --env-file /etc/maanslogen/pi.env up -d
 ```
+
+Scripts og workflows finder selv filen: `MAANSLOGEN_ENV_FILE` hvis den er sat,
+ellers `/etc/maanslogen/pi.env`, ellers en `.env` ved siden af
+`docker-compose.yml`. Findes ingen af dem, siger de fra med det samme frem for
+at køre videre med tomme variabler.
 
 Første gang oprettes begge databaser. Byg imaget og få skema og testdata på
 plads:
@@ -132,7 +144,7 @@ cd ~/maanslogen
 docker build -f apps/api/Dockerfile -t maanslogen-api:latest .
 docker tag maanslogen-api:latest maanslogen-api:dev
 
-set -a; . infra/pi/.env; set +a
+. infra/pi/load-env.sh
 for db in maanslogen maanslogen_dev; do
   docker run --rm --network maanslogen \
     -e DATABASE_URL="postgresql://$POSTGRES_USER:$POSTGRES_PASSWORD@postgres:5432/$db?schema=public" \
