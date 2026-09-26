@@ -2,10 +2,9 @@ import Link from "next/link";
 import type { Route } from "next";
 import type { Category, BeverageSummary, Paginated } from "@maanslogen/contracts";
 import { api } from "@/lib/api/api.server";
-import { Button } from "@/components/ui/button";
 import { BeverageCard } from "@/components/catalog/beverage-card";
-import { BubbleField } from "@/components/motion/bubble-field";
 import { formatCount } from "@/lib/format";
+import { Hero } from "@/components/home/hero";
 
 // Forsiden er den samme for alle og ændrer sig sjældent — den genopbygges
 // i baggrunden hvert kvarter i stedet for ved hver besøgende.
@@ -37,67 +36,6 @@ export default async function HomePage() {
         page={newest}
       />
     </>
-  );
-}
-
-function Hero({
-  beverageCount,
-  categoryCount,
-  typeCount,
-}: {
-  beverageCount: number | null;
-  categoryCount: number | null;
-  typeCount: number | null;
-}) {
-  return (
-    <section className="relative overflow-hidden border-b border-line">
-      <BubbleField />
-      <div className="relative mx-auto grid max-w-7xl gap-10 px-4 py-16 sm:px-6 lg:grid-cols-[1.1fr_0.9fr] lg:py-24">
-        <div className="flex flex-col gap-5">
-          <span className="text-xs font-bold uppercase tracking-[0.14em] text-accent">
-            Din smagsbog
-          </span>
-          <h1 className="font-display text-4xl font-semibold leading-[1.05] tracking-tight sm:text-5xl lg:text-6xl">
-            Smag den. Noter den.
-            <br />
-            Husk hvorfor.
-          </h1>
-          <p className="max-w-lg text-base leading-relaxed text-ink-soft sm:text-lg">
-            Anmeld øl, vin og spiritus med de spørgsmål der faktisk giver mening for hver kategori —
-            ikke den samme generiske formular til det hele.
-          </p>
-          <div className="flex flex-wrap gap-3 pt-1">
-            <Button asChild size="lg">
-              <Link href="/katalog">Udforsk kataloget</Link>
-            </Button>
-            <Button asChild variant="secondary" size="lg">
-              <Link href="/kategorier">Se kategorier</Link>
-            </Button>
-          </div>
-        </div>
-
-        <div className="flex items-center">
-          <dl className="grid w-full grid-cols-3 gap-4 rounded-[var(--radius-card)] border border-line bg-surface/70 p-6 backdrop-blur-sm">
-            <Stat label="drikkevarer" value={beverageCount} />
-            <Stat label="kategorier" value={categoryCount} />
-            <Stat label="typer" value={typeCount} />
-          </dl>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-/** Et tal vi ikke har, vises som "—" frem for som 0. */
-function Stat({ label, value }: { label: string; value: number | null }) {
-  return (
-    <div>
-      <dt className="sr-only">{label}</dt>
-      <dd className="font-display text-2xl font-semibold sm:text-3xl">
-        {value === null ? "—" : formatCount(value)}
-      </dd>
-      <p className="text-xs text-ink-muted sm:text-sm">{label}</p>
-    </div>
   );
 }
 

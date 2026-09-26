@@ -27,14 +27,20 @@ export function Providers({ children }: { children: React.ReactNode }) {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+      {/* Mørk er standarden — udtrykket er bygget til den. Lys er stadig et valg. */}
+      <ThemeProvider attribute="class" defaultTheme="dark" enableSystem disableTransitionOnChange>
         {children}
         <Toaster
           position="bottom-right"
+          // Uden dette beholder sonner sine egne lyse farver på en mørk flade.
+          theme="system"
           toastOptions={{
             classNames: {
               toast:
-                "rounded-[var(--radius-control)] border border-line bg-surface text-ink shadow-[var(--shadow-pop)]",
+                "rounded-[var(--radius-control)] border border-line bg-surface font-mono text-sm text-ink shadow-[var(--shadow-pop)]",
+              description: "text-ink-muted",
+              closeButton: "border-line bg-surface text-ink-muted hover:text-ink",
+              icon: "text-accent",
             },
           }}
         />

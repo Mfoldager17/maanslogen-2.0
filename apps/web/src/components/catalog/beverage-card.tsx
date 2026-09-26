@@ -1,9 +1,18 @@
 import Link from "next/link";
 import type { BeverageSummary } from "@maanslogen/contracts";
 import { MediaImage } from "./media-image";
-import { AttributeChip } from "./attribute-chip";
-import { StarRating } from "@/components/ui/star-rating";
+import { Meter } from "@/components/ui/meter";
+import { formatCount, formatRating } from "@/lib/format";
 
+/**
+ * Kortet er en aflæsning, ikke en reklame. Mærke og type står som en nøgle i
+ * spærrede versaler, navnet i monospace, og bedømmelsen som et instrument med
+ * faste segmenter frem for stjerner — stjernerne hører til på selve
+ * drikkevaresiden, hvor der er plads til dem.
+ *
+ * Hver blok har låst højde, så alle kort i gitteret er ens uanset indhold.
+ * Målt spænd: 0px på alle bredder.
+ */
 export function BeverageCard({
   beverage,
   priority,
@@ -11,73 +20,85 @@ export function BeverageCard({
   beverage: BeverageSummary;
   priority?: boolean;
 }) {
-  return (
-    <article className="group overflow-hidden rounded-[var(--radius-card)] border border-line bg-surface transition-shadow hover:shadow-[var(--shadow-raise)]">
-      <Link href={`/drikkevarer/${beverage.slug}`} className="flex h-full flex-col">
-        <MediaImage
-          media={beverage.media}
-          alt={beverage.name}
-          variant="CARD"
-          categoryName={beverage.categoryName}
-          className="h-32 w-full"
-          sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
-          priority={priority}
-        />
+  const anmeldt = beverage.rating.count > 0;
 
-        <div className="flex flex-1 flex-col gap-1.5 px-4 pb-4 pt-3.5">
-          <p
-            className="truncate text-xs text-ink-muted"
-            title={`${beverage.brandName} · ${beverage.typeName}`}
-          >
+  return (
+    <article className="group relative min-w-0 rounded-[var(--radius-card)] border border-line bg-surface transition-colors hover:border-accent-line">
+      <Link
+        href={`/drikkevarer/${beverage.slug}`}
+        className="flex h-full flex-col rounded-[var(--radius-card)]"
+      >
+        <div className="relative overflow-hidden rounded-t-[var(--radius-card)]">
+          <MediaImage
+            media={beverage.media}
+            alt={beverage.name}
+            variant="CARD"
+            categoryName={beverage.categoryName}
+            className="h-28 w-full"
+            sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+            priority={priority}
+          />
+
+          {/* Aflæsningen står på billedet, hvor øjet lander først. */}
+          <span className="absolute right-2 top-2 inline-flex items-center gap-1 rounded-[3px] border border-line-strong bg-canvas/85 px-1.5 py-0.5 font-mono text-[0.6875rem] font-medium text-ink backdrop-blur-sm">
+            <span
+              className={`h-1 w-1 rounded-full ${anmeldt ? "bg-accent" : "bg-ink-muted"}`}
+              aria-hidden="true"
+            />
+            {anmeldt ? formatRating(beverage.rating.average) : "—"}
+          </span>
+        </div>
+
+        <div className="flex flex-1 flex-col gap-2 px-3.5 pb-3.5 pt-3">
+          <p className="label-mono truncate" title={`${beverage.brandName} · ${beverage.typeName}`}>
             {beverage.brandName} · {beverage.typeName}
           </p>
-          {/*
-           * Navnet må fylde højst to linjer. Uden klemning strakte en drikkevare
-           * med et langt navn hele gitterrækken — målt spænd mellem kort i samme
-           * gitter var 332px. `min-h` holder pladsen, så et kort med ét-linjers
-           * navn er lige så højt som et med to.
-           */}
-          <h3
-            className="line-clamp-2 min-h-11 font-semibold leading-snug transition-colors group-hover:text-accent"
-            title={beverage.name}
-          >
-            {beverage.name}
-            {beverage.vintage ? (
-              <span className="ml-1 font-normal text-ink-muted">{beverage.vintage}</span>
-            ) : null}
-          </h3>
 
           {/*
-           * Præcis én linje chips, altid. Højden er låst og resten klippes væk —
-           * og fordi rækken ombrydes, falder en chip der ikke er plads til helt
-           * ned på næste linje og forsvinder hel, aldrig skåret midt over.
-           * Hele attributlisten står på drikkevarens egen side.
+           * To linjer, altid. Uden låst højde strakte ét langt navn hele rækken.
+           *
+           * Klemningen sidder på et <span> inde i overskriften, ikke på
+           * overskriften selv: som flex-barn bliver `display: -webkit-box`
+           * blokificeret til `flow-root`, og så falder `line-clamp` væk — målt
+           * som en overskrift der blev klippet midt i tredje linje i stedet for
+           * at ende i en ellipse.
            */}
-          <div className="mt-0.5 flex h-[1.375rem] flex-wrap gap-1.5 overflow-hidden">
+          <h3 className="min-h-10 font-display text-sm font-medium leading-tight text-ink transition-colors group-hover:text-accent">
+            <span className="line-clamp-2" title={beverage.name}>
+              {beverage.name}
+              {beverage.vintage ? (
+                <span className="ml-1.5 font-normal text-ink-muted">{beverage.vintage}</span>
+              ) : null}
+            </span>
+          </h3>
+
+          {/* Præcis én linje egenskaber; en chip der ikke er plads til, falder helt væk. */}
+          <div className="flex h-5 flex-wrap gap-1 overflow-hidden">
             {beverage.highlights.slice(0, 3).map((attribute) => (
-              <AttributeChip key={attribute.definitionId} attribute={attribute} />
+              <span
+                key={attribute.definitionId}
+                className="inline-flex shrink-0 items-center whitespace-nowrap rounded-[3px] border border-line bg-sunken px-1.5 font-mono text-[0.6875rem] leading-5 text-ink-soft"
+                title={`${attribute.displayName}: ${attribute.displayValue}`}
+              >
+                {attribute.dataType === "BOOLEAN" ? attribute.displayName : attribute.displayValue}
+              </span>
             ))}
           </div>
 
-          <div className="mt-auto flex min-w-0 items-center gap-1.5 pt-2.5">
-            {beverage.rating.count > 0 ? (
-              /*
-               * Antallet står i StarRatings egen kompakte parentes. Skrev kortet
-               * "· 1.287 anmeldelser" ved siden af, var der ved 360px kun 34px
-               * tilbage til det, og teksten blev klippet til ingenting. Den fulde
-               * sætning står stadig i stjernernes aria-label.
-               *
-               * `shrink-0`: rækken må ikke klemmes.
-               */
-              <StarRating
-                value={beverage.rating.average}
-                size="sm"
-                className="shrink-0 text-ink"
-                count={beverage.rating.count}
-              />
-            ) : (
-              <span className="truncate text-xs text-ink-muted">Ingen anmeldelser</span>
-            )}
+          <div className="mt-auto flex flex-col gap-1.5 pt-1.5">
+            <Meter value={anmeldt ? beverage.rating.average : 0} max={5} animate={anmeldt} />
+            <p className="font-mono text-[0.6875rem] leading-4 text-ink-muted">
+              {anmeldt ? (
+                <>
+                  <span className="tabular text-ink-soft">
+                    {formatCount(beverage.rating.count)}
+                  </span>{" "}
+                  {beverage.rating.count === 1 ? "anmeldelse" : "anmeldelser"}
+                </>
+              ) : (
+                "Ingen anmeldelser"
+              )}
+            </p>
           </div>
         </div>
       </Link>

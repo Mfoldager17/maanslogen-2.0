@@ -8,29 +8,28 @@ export function Skeleton({ className, ...props }: React.HTMLAttributes<HTMLDivEl
  * Pladsholder med samme mål som et drikkevarekort, så listen ikke hopper.
  *
  * Hver blok spejler sin modpart i `beverage-card.tsx` — samme polstring,
- * samme `gap-1.5`, samme `min-h-11` til navnet og samme faste chip-række.
- * Den gamle udgave var 262px mod kortets 292px, så gitteret sprang 30px
- * pr. række i det øjeblik data landede.
+ * samme `gap-2`, samme `min-h-10` til navnet, samme faste chip-række og
+ * samme målerhøjde. Måles kortets højde og skelettets, skal de være ens.
  */
 export function BeverageCardSkeleton() {
   return (
-    <div className="overflow-hidden rounded-[var(--radius-card)] border border-line bg-surface">
-      <Skeleton className="h-32 rounded-none" />
-      <div className="flex flex-col gap-1.5 px-4 pb-4 pt-3.5">
-        {/* Mærke · type, text-xs → 16px */}
+    <div className="rounded-[var(--radius-card)] border border-line bg-surface">
+      <Skeleton className="h-28 rounded-b-none" />
+      <div className="flex flex-col gap-2 px-3.5 pb-3.5 pt-3">
+        {/* Mærke · type i label-mono → 16px */}
         <Skeleton className="h-4 w-28" />
-        {/* Navnet må fylde to linjer, og pladsen står altid åben. */}
-        <div className="flex min-h-11 flex-col gap-1">
+        {/* Navnet fylder to linjer, og pladsen står altid åben. */}
+        <div className="flex min-h-10 flex-col gap-1">
           <Skeleton className="h-4 w-full" />
-          <Skeleton className="h-4 w-2/3" />
+          <Skeleton className="h-4 w-3/5" />
         </div>
-        <div className="mt-0.5 flex h-[1.375rem] gap-1.5">
-          <Skeleton className="h-full w-14 rounded-md" />
-          <Skeleton className="h-full w-16 rounded-md" />
+        <div className="flex h-5 gap-1">
+          <Skeleton className="h-full w-12" />
+          <Skeleton className="h-full w-16" />
         </div>
-        {/* Bedømmelsesrækken er 20px høj: snittet står i text-sm ved siden af stjernerne. */}
-        <div className="pt-2.5">
-          <Skeleton className="h-5 w-32" />
+        <div className="mt-auto flex flex-col gap-1.5 pt-1.5">
+          <Skeleton className="h-2.5 w-full" />
+          <Skeleton className="h-4 w-24" />
         </div>
       </div>
     </div>

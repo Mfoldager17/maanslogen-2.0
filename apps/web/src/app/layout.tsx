@@ -1,13 +1,26 @@
 import type { Metadata, Viewport } from "next";
-import { Fraunces, Public_Sans } from "next/font/google";
+import { JetBrains_Mono, Public_Sans, Space_Grotesk } from "next/font/google";
 import { Providers } from "./providers";
 import "@/styles/globals.css";
 
-const display = Fraunces({
+/*
+ * To skrifter med hver sin opgave. Space Grotesk til overskrifter: en
+ * grotesk med tekniske træk og markante bogstavformer — den bærer
+ * personligheden uden at forklæde sig som en terminal.
+ */
+const display = Space_Grotesk({
   subsets: ["latin"],
-  variable: "--font-fraunces",
+  variable: "--font-space-grotesk",
   display: "swap",
-  weight: ["400", "600", "700"],
+  weight: ["500", "600", "700"],
+});
+
+/* JetBrains Mono bruges kun til data: tal, enheder, nøgler og tastetryk. */
+const mono = JetBrains_Mono({
+  subsets: ["latin"],
+  variable: "--font-jetbrains-mono",
+  display: "swap",
+  weight: ["400", "500", "700"],
 });
 
 const body = Public_Sans({
@@ -29,8 +42,8 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#fbf8f3" },
-    { media: "(prefers-color-scheme: dark)", color: "#171310" },
+    { media: "(prefers-color-scheme: light)", color: "#f6f7f5" },
+    { media: "(prefers-color-scheme: dark)", color: "#0a0c0d" },
   ],
 };
 
@@ -38,11 +51,15 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     // suppressHydrationWarning: next-themes sætter klassen på <html> før React
     // hydrerer, så serverens markup med vilje ikke matcher.
-    <html lang="da" suppressHydrationWarning className={`${display.variable} ${body.variable}`}>
+    <html
+      lang="da"
+      suppressHydrationWarning
+      className={`${display.variable} ${mono.variable} ${body.variable}`}
+    >
       <body className="min-h-dvh">
         <a
           href="#indhold"
-          className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-accent focus:px-4 focus:py-2 focus:text-on-accent"
+          className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-[var(--radius-control)] focus:bg-accent focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-on-accent"
         >
           Spring til indhold
         </a>

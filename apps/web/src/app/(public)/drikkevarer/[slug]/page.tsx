@@ -7,6 +7,7 @@ import { serverApiOrNull } from "@/lib/api/server";
 import type { Beverage, TasteProfile } from "@maanslogen/contracts";
 import { MediaImage } from "@/components/catalog/media-image";
 import { RatingSummaryPanel } from "@/components/catalog/rating-summary";
+import { Panel } from "@/components/ui/panel";
 import { TasteProfilePanel } from "@/components/catalog/taste-profile";
 import { ReviewList } from "@/components/catalog/review-list";
 import { Button } from "@/components/ui/button";
@@ -48,7 +49,7 @@ export default async function BeveragePage({ params }: Params) {
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
-      <nav aria-label="Brødkrumme" className="mb-6 text-sm text-ink-muted">
+      <nav aria-label="Brødkrumme" className="mb-6 font-mono text-xs text-ink-muted">
         <Link href="/katalog" className="hover:text-ink">
           Katalog
         </Link>
@@ -63,7 +64,7 @@ export default async function BeveragePage({ params }: Params) {
             </Link>
           </>
         ) : null}
-        <span className="mx-1.5">/</span>
+        <span className="mx-1.5 text-line-strong">/</span>
         <span className="text-ink">{beverage.name}</span>
       </nav>
 
@@ -103,7 +104,7 @@ export default async function BeveragePage({ params }: Params) {
               {beverage.vintage ? <Badge>Årgang {beverage.vintage}</Badge> : null}
             </div>
 
-            <h1 className="break-words font-display text-4xl font-semibold leading-tight tracking-tight">
+            <h1 className="break-words font-display text-3xl font-bold leading-tight tracking-tight sm:text-4xl">
               {beverage.name}
             </h1>
 
@@ -119,31 +120,26 @@ export default async function BeveragePage({ params }: Params) {
           </div>
 
           {beverage.attributes.length > 0 ? (
-            <section aria-labelledby="egenskaber" className="border-t border-line pt-5">
-              <h2
-                id="egenskaber"
-                className="mb-3 text-xs font-bold uppercase tracking-[0.12em] text-ink-muted"
-              >
-                Egenskaber
-              </h2>
-              {/*
-               * Fire spalter gav felter der var smallere end etiketter som
-               * "Serveringstemperatur", så teksten skrev sig ud over rammen.
-               */}
-              <dl className="grid grid-cols-2 gap-3 xl:grid-cols-3">
+            /*
+             * Egenskaberne står som en aflæsning: nøglen til venstre, værdien
+             * til højre, én pr. linje. Et gitter af kasser gav felter der var
+             * smallere end etiketter som "Serveringstemperatur".
+             */
+            <Panel title="Egenskaber" tone="signal" meta={`${beverage.attributes.length}`}>
+              <dl className="flex flex-col divide-y divide-line">
                 {beverage.attributes.map((attribute) => (
                   <div
                     key={attribute.definitionId}
-                    className="rounded-[var(--radius-control)] border border-line bg-surface px-3.5 py-3"
+                    className="flex items-baseline justify-between gap-4 py-2 first:pt-0 last:pb-0"
                   >
-                    <dt className="break-words text-xs text-ink-muted">{attribute.displayName}</dt>
-                    <dd className="break-words font-display text-xl font-semibold">
+                    <dt className="label-mono min-w-0 break-words">{attribute.displayName}</dt>
+                    <dd className="tabular shrink-0 break-words text-right font-mono text-sm text-ink">
                       {attribute.displayValue}
                     </dd>
                   </div>
                 ))}
               </dl>
-            </section>
+            </Panel>
           ) : null}
         </div>
 

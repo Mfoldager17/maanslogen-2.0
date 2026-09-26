@@ -40,7 +40,7 @@ export function Button({
         // `whitespace-nowrap`: knappen har låst højde, så en etiket der brød til
         // to linjer skrev sig ud over sin egen baggrund. `[&_svg]:shrink-0`: et
         // ikon ved siden af tekst blev ellers mast fladt når knappen blev smal.
-        "inline-flex items-center justify-center whitespace-nowrap rounded-[var(--radius-control)] font-semibold",
+        "inline-flex items-center justify-center whitespace-nowrap rounded-[var(--radius-control)] font-display font-semibold",
         "[&_svg]:shrink-0",
         "transition-colors duration-150",
         "disabled:cursor-not-allowed disabled:opacity-55",
