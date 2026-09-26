@@ -155,12 +155,28 @@ den labels `self-hosted` og **`maanslogen-pi`** — workflowsene beder om netop
 den. Installér den som tjeneste med `./svc.sh install && ./svc.sh start`, så
 den overlever en genstart.
 
-> **Vær opmærksom:** en selvhostet runner kører workflow-kode på din maskine.
-> Derfor kører `preview.yml` kun for PR'er fra selve repoet, aldrig fra en
-> fork — ellers kunne enhver, der åbner et PR, køre vilkårlige kommandoer på
-> Pi'en. Det tjek er det eneste der står mellem en fremmed og din maskine, så
-> lad være med at fjerne det. Slå også _Settings → Actions → Fork pull request
-> workflows_ fra, hvis repoet nogensinde bliver offentligt.
+> **Vigtigt, fordi repoet er offentligt.** En selvhostet runner kører
+> workflow-kode på din maskine derhjemme, og alle kan forke et offentligt repo
+> og åbne et PR. GitHub fraråder direkte den kombination.
+>
+> Derfor står der på både `api`- og `web`-jobbet i `preview.yml`:
+>
+> ```yaml
+> if: github.event.pull_request.head.repo.full_name == github.repository
+> ```
+>
+> Det er sandt kun når grenen ligger i repoet selv, hvilket kræver
+> push-adgang; en fork har et andet navn, og GitHub afviser jobbet før der
+> tildeles en runner. **Fjern ikke de to linjer** — de er det eneste der står
+> mellem en fremmed og Pi'en.
+>
+> Sæt derudover _Settings → Actions → General → Fork pull request workflows
+> from outside collaborators_ til **Require approval for all external
+> collaborators**.
+>
+> Vil du lukke hullet helt, så gør repoet privat. Det koster
+> Actions-minutter (se [Hvad det koster](#hvad-det-koster)), men så kan ingen
+> fork udløse noget overhovedet.
 
 ### 4. Hemmeligheder og variabler i GitHub
 
@@ -289,6 +305,25 @@ JWT-nøgler, sin egen bucket og sit eget skema.
 | Tunnel  | Gratis                                                   |
 | DNS     | Gratis                                                   |
 | Pi'en   | Strøm                                                    |
+
+**GitHub Actions.** Repoet er offentligt, og på offentlige repoer er
+GitHub-hostede runnere gratis uden loft. Målt på en rigtig kørsel: 239
+sekunders væg-tid, `billable.UBUNTU.total_ms = 0`. Den selvhostede runner på
+Pi'en tæller aldrig med — hverken på et offentligt eller et privat repo.
+
+Gøres repoet privat, tæller de GitHub-hostede jobs med i den månedlige pulje
+(2.000 minutter på GitHub Free, 3.000 på Pro). Forbruget målt på samme kørsel:
+
+| Job                        | Hvor   | Tid    |
+| -------------------------- | ------ | ------ |
+| CI · typecheck, lint, test | GitHub | ~2 min |
+| CI · Docker-images         | GitHub | ~4 min |
+| Preview · web              | GitHub | ~4 min |
+| Preview · API              | Pi'en  | gratis |
+| Oprydning og nulstilling   | Pi'en  | gratis |
+
+Cirka 10 minutter pr. push til et PR, altså omkring 200 pushes om måneden
+inden for de 2.000.
 
 Det eneste der reelt kan vælte tallene, er R2's Class B-operationer, og dem
 holder cache-reglen nede. Regnestykket står i

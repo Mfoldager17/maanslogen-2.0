@@ -15,23 +15,22 @@ permissions:
   contents: read
   pull-requests: write
 
+# En selvhostet runner kører workflow-kode på Pi'en derhjemme, og repoet er
+# offentligt: hvem som helst kan forke og åbne et PR. Betingelsen herunder er
+# det eneste der står mellem en fremmed og maskinen, så den står direkte på
+# hvert job frem for at gå gennem et hjælpejob.
+#
+# `head.repo.full_name == github.repository` er sandt kun når grenen ligger i
+# repoet selv, hvilket kræver push-adgang. En fork har et andet navn.
+#
+# Tidligere blev tjekket lavet i et `guard`-job, der skrev true/false til en
+# output-variabel. To ting var skidt ved det: værdien fra forespørgslen blev
+# interpoleret ind i en shell-kommando, og hele beskyttelsen afhang af at det
+# job kørte færdigt. Nu afviser GitHub selv jobbet, før der tildeles en runner.
 jobs:
-  # En selvhostet runner kører workflowets kode på Pi'en. Et PR fra en fork må
-  # derfor ikke udløse den — det ville lade enhver køre vilkårlige kommandoer
-  # på maskinen. Alt herunder hænger på dette ene tjek.
-  guard:
-    name: Kun PR fra selve repoet
-    runs-on: ubuntu-latest
-    outputs:
-      egen-gren: ${{ steps.tjek.outputs.egen }}
-    steps:
-      - id: tjek
-        run: echo "egen=${{ github.event.pull_request.head.repo.full_name == github.repository }}" >> "$GITHUB_OUTPUT"
-
   api:
     name: API-preview på Pi'en
-    needs: guard
-    if: needs.guard.outputs.egen-gren == 'true'
+    if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: [self-hosted, maanslogen-pi]
     steps:
       - uses: actions/checkout@v4
@@ -55,8 +54,7 @@ jobs:
 
   web:
     name: Web-preview på Workers
-    needs: guard
-    if: needs.guard.outputs.egen-gren == 'true'
+    if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     outputs:
       url: ${{ steps.upload.outputs.url }}
