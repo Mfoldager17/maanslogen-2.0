@@ -4,6 +4,7 @@ import { ArrowRight } from "lucide-react";
 import { api } from "@/lib/api/api.server";
 import { AdminPageHeader } from "@/components/admin/page-header";
 import { StarRating } from "@/components/ui/star-rating";
+import { EmptyState } from "@/components/ui/empty-state";
 import { formatCount, formatRelative } from "@/lib/format";
 
 export default async function AdminDashboard() {
@@ -39,7 +40,7 @@ export default async function AdminDashboard() {
           <li key={stat.label}>
             <Link
               href={stat.href}
-              className="flex h-full flex-col gap-1 rounded-[var(--radius-card)] border border-line bg-surface px-4 py-3.5 transition-colors hover:border-accent-line"
+              className="flex h-full flex-col gap-1 rounded-[var(--radius-card)] border border-line bg-surface px-5 py-4 transition-colors hover:border-accent-line"
             >
               <span className="font-display text-2xl font-semibold tabular">
                 {stat.value === null ? "—" : formatCount(stat.value)}
@@ -62,21 +63,29 @@ export default async function AdminDashboard() {
           </Link>
         </div>
 
-        <ul className="flex flex-col gap-2">
-          {reviews.items.map((review) => (
-            <li
-              key={review.id}
-              className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-[var(--radius-control)] border border-line bg-surface px-4 py-3 text-sm"
-            >
-              <StarRating value={review.rating} size="sm" showValue={false} />
-              <span className="font-semibold">{review.beverageName ?? "Ukendt drikkevare"}</span>
-              <span className="text-ink-muted">af {review.author.displayName}</span>
-              <span className="ml-auto text-xs text-ink-muted">
-                {formatRelative(review.createdAt)}
-              </span>
-            </li>
-          ))}
-        </ul>
+        {/* Uden tom-tilstand stod overskriften og "Se alle" over et tomt hul. */}
+        {reviews.items.length === 0 ? (
+          <EmptyState
+            title="Ingen anmeldelser endnu"
+            description="De nyeste dukker op her, så snart nogen har anmeldt."
+          />
+        ) : (
+          <ul className="flex flex-col gap-2">
+            {reviews.items.map((review) => (
+              <li
+                key={review.id}
+                className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-[var(--radius-card)] border border-line bg-surface px-5 py-4 text-sm"
+              >
+                <StarRating value={review.rating} size="sm" showValue={false} />
+                <span className="font-semibold">{review.beverageName ?? "Ukendt drikkevare"}</span>
+                <span className="text-ink-muted">af {review.author.displayName}</span>
+                <span className="ml-auto text-xs text-ink-muted">
+                  {formatRelative(review.createdAt)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
       </section>
     </>
   );

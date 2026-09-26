@@ -4,14 +4,8 @@ import { roleSchema, type Role } from "@maanslogen/contracts";
 import { useId } from "react";
 import { api } from "@/lib/api/api.browser";
 import { NativeSelect } from "@/components/ui/field";
+import { ROLLE_ETIKETTER } from "@/lib/roller";
 import { useApiMutation } from "@/lib/use-mutation";
-
-/** Rollerne hedder noget på dansk i resten af fladen; enum-værdien er API'ets. */
-const ROLLER: Record<Role, string> = {
-  USER: "Bruger",
-  MODERATOR: "Moderator",
-  ADMIN: "Administrator",
-};
 
 /**
  * Rolleskift bumper brugerens tokenVersion i API'et, så en degradering
@@ -46,7 +40,7 @@ export function UserRoleSelect({
       >
         {roleSchema.options.map((option) => (
           <option key={option} value={option}>
-            {ROLLER[option]}
+            {ROLLE_ETIKETTER[option]}
           </option>
         ))}
       </NativeSelect>

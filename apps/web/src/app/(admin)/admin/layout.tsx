@@ -17,7 +17,11 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
   return (
     <div className="flex min-h-dvh flex-col lg:flex-row">
-      <aside className="flex shrink-0 flex-col gap-6 border-b border-line bg-surface px-4 py-5 lg:h-dvh lg:w-64 lg:border-b-0 lg:border-r lg:overflow-y-auto">
+      {/*
+       * `sticky`: uden den gav `h-dvh` en spalte der var præcis én skærm høj,
+       * så den hvide flade og skillelinjen stoppede midt nede på en lang liste.
+       */}
+      <aside className="flex shrink-0 flex-col gap-6 border-b border-line bg-surface px-4 py-5 lg:sticky lg:top-0 lg:h-dvh lg:w-64 lg:overflow-y-auto lg:border-b-0 lg:border-r">
         <div className="flex items-center gap-2">
           <Logo href="/" />
           <Badge tone="accent">Admin</Badge>

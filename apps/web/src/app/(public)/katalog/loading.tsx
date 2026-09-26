@@ -43,7 +43,8 @@ export default function CatalogLoading() {
 
         <div>
           <ul className="grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-4">
-            {Array.from({ length: 8 }, (_, index) => (
+            {/* Samme antal som `limit` i page.tsx, ellers vokser siden når data lander. */}
+            {Array.from({ length: 24 }, (_, index) => (
               <li key={index}>
                 <BeverageCardSkeleton />
               </li>

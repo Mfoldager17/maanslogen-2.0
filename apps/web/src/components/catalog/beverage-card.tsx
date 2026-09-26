@@ -3,7 +3,6 @@ import type { BeverageSummary } from "@maanslogen/contracts";
 import { MediaImage } from "./media-image";
 import { AttributeChip } from "./attribute-chip";
 import { StarRating } from "@/components/ui/star-rating";
-import { formatCount } from "@/lib/format";
 
 export function BeverageCard({
   beverage,
@@ -62,25 +61,22 @@ export function BeverageCard({
 
           <div className="mt-auto flex min-w-0 items-center gap-1.5 pt-2.5">
             {beverage.rating.count > 0 ? (
-              <>
-                {/*
-                 * `shrink-0`: stjernernes udfyldning er en andel af rækkens egen
-                 * bredde, så rækken må ikke klemmes — så rammer udfyldningen
-                 * ikke længere stjernerne bagved.
-                 */}
-                <StarRating
-                  value={beverage.rating.average}
-                  size="sm"
-                  className="shrink-0 text-ink"
-                  count={undefined}
-                />
-                <span className="truncate text-xs text-ink-muted">
-                  · {formatCount(beverage.rating.count)}{" "}
-                  {beverage.rating.count === 1 ? "anmeldelse" : "anmeldelser"}
-                </span>
-              </>
+              /*
+               * Antallet står i StarRatings egen kompakte parentes. Skrev kortet
+               * "· 1.287 anmeldelser" ved siden af, var der ved 360px kun 34px
+               * tilbage til det, og teksten blev klippet til ingenting. Den fulde
+               * sætning står stadig i stjernernes aria-label.
+               *
+               * `shrink-0`: rækken må ikke klemmes.
+               */
+              <StarRating
+                value={beverage.rating.average}
+                size="sm"
+                className="shrink-0 text-ink"
+                count={beverage.rating.count}
+              />
             ) : (
-              <span className="truncate text-xs text-ink-muted">Ingen anmeldelser endnu</span>
+              <span className="truncate text-xs text-ink-muted">Ingen anmeldelser</span>
             )}
           </div>
         </div>

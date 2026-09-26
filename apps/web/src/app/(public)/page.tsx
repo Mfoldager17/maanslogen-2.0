@@ -12,15 +12,23 @@ import { formatCount } from "@/lib/format";
 export const revalidate = 900;
 
 export default async function HomePage() {
-  const [categories, topRated, newest] = await Promise.all([
+  // Tallene i heroen skal være de rigtige. To af dem stod hardkodet som "6"
+  // og "18", så forsiden kunne modsige kategorisiden på samme skærm.
+  const [categories, topRated, newest, alleKategorier, alleTyper] = await Promise.all([
     api.categories.list({ limit: 6, sort: "sortOrder", active: true }),
     api.beverages.list({ limit: 4, sort: "rating", order: "desc", withTotal: true }),
     api.beverages.list({ limit: 4, sort: "createdAt", order: "desc" }),
+    api.categories.list({ limit: 1, active: true, withTotal: true }),
+    api.types.list({ limit: 1, active: true, withTotal: true }),
   ]);
 
   return (
     <>
-      <Hero beverageCount={topRated.pageInfo.total ?? 0} />
+      <Hero
+        beverageCount={topRated.pageInfo.total}
+        categoryCount={alleKategorier.pageInfo.total}
+        typeCount={alleTyper.pageInfo.total}
+      />
       <Categories categories={categories.items} />
       <BeverageRow title="Højest bedømt" href="/katalog?sort=rating&order=desc" page={topRated} />
       <BeverageRow
@@ -32,7 +40,15 @@ export default async function HomePage() {
   );
 }
 
-function Hero({ beverageCount }: { beverageCount: number }) {
+function Hero({
+  beverageCount,
+  categoryCount,
+  typeCount,
+}: {
+  beverageCount: number | null;
+  categoryCount: number | null;
+  typeCount: number | null;
+}) {
   return (
     <section className="relative overflow-hidden border-b border-line">
       <BubbleField />
@@ -62,9 +78,9 @@ function Hero({ beverageCount }: { beverageCount: number }) {
 
         <div className="flex items-center">
           <dl className="grid w-full grid-cols-3 gap-4 rounded-[var(--radius-card)] border border-line bg-surface/70 p-6 backdrop-blur-sm">
-            <Stat label="drikkevarer" value={formatCount(beverageCount)} />
-            <Stat label="kategorier" value="6" />
-            <Stat label="typer" value="18" />
+            <Stat label="drikkevarer" value={beverageCount} />
+            <Stat label="kategorier" value={categoryCount} />
+            <Stat label="typer" value={typeCount} />
           </dl>
         </div>
       </div>
@@ -72,11 +88,14 @@ function Hero({ beverageCount }: { beverageCount: number }) {
   );
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
+/** Et tal vi ikke har, vises som "—" frem for som 0. */
+function Stat({ label, value }: { label: string; value: number | null }) {
   return (
     <div>
       <dt className="sr-only">{label}</dt>
-      <dd className="font-display text-2xl font-semibold sm:text-3xl">{value}</dd>
+      <dd className="font-display text-2xl font-semibold sm:text-3xl">
+        {value === null ? "—" : formatCount(value)}
+      </dd>
       <p className="text-xs text-ink-muted sm:text-sm">{label}</p>
     </div>
   );
@@ -93,14 +112,17 @@ function Categories({ categories }: { categories: Category[] }) {
           <li key={category.id}>
             <Link
               href={`/katalog?categorySlug=${category.slug}`}
-              className="flex h-full flex-col gap-2 rounded-[var(--radius-card)] border border-line bg-surface px-4 py-4 transition-colors hover:border-accent-line hover:bg-accent-soft/40"
+              className="flex h-full flex-col gap-2 rounded-[var(--radius-card)] border border-line bg-surface px-5 py-4 transition-colors hover:border-accent-line hover:bg-accent-soft/40"
             >
               <span className="text-2xl leading-none" aria-hidden="true">
                 {category.icon ?? "🥂"}
               </span>
               <span className="font-semibold">{category.name}</span>
               {category.beverageCount !== undefined ? (
-                <span className="text-xs text-ink-muted">{category.beverageCount} drikke</span>
+                <span className="text-xs text-ink-muted">
+                  {formatCount(category.beverageCount)}{" "}
+                  {category.beverageCount === 1 ? "drikkevare" : "drikkevarer"}
+                </span>
               ) : null}
             </Link>
           </li>

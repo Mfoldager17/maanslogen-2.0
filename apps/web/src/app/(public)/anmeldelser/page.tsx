@@ -3,6 +3,7 @@ import { api } from "@/lib/api/api.server";
 import { ReviewList } from "@/components/catalog/review-list";
 import { first, type SearchParams } from "@/lib/query-state";
 import Link from "next/link";
+import { Button } from "@/components/ui/button";
 
 export const metadata: Metadata = {
   title: "Anmeldelser",
@@ -31,12 +32,12 @@ export default async function ReviewsPage({
 
       {page.pageInfo.nextCursor ? (
         <div className="flex justify-center pt-8">
-          <Link
-            href={`/anmeldelser?cursor=${encodeURIComponent(page.pageInfo.nextCursor)}`}
-            className="inline-flex h-12 items-center rounded-[var(--radius-control)] border border-line-strong bg-surface px-6 text-sm font-semibold hover:bg-sunken"
-          >
-            Vis flere
-          </Link>
+          {/* Samme knap som i kataloget — den var før håndskrevet med mindre skrift. */}
+          <Button asChild variant="secondary" size="lg">
+            <Link href={`/anmeldelser?cursor=${encodeURIComponent(page.pageInfo.nextCursor)}`}>
+              Vis flere
+            </Link>
+          </Button>
         </div>
       ) : null}
     </div>

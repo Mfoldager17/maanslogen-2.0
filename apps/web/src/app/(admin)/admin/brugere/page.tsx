@@ -10,7 +10,7 @@ import { AdminPager } from "@/components/admin/admin-pager";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Badge } from "@/components/ui/badge";
 import { UserRoleSelect } from "@/components/admin/user-role-select";
-import { formatDate, formatRelative } from "@/lib/format";
+import { formatDate, formatNumber, formatRelative } from "@/lib/format";
 import { first, type SearchParams } from "@/lib/query-state";
 
 export default async function AdminUsersPage({
@@ -38,8 +38,12 @@ export default async function AdminUsersPage({
       header: "Bruger",
       render: (row) => (
         <div className="min-w-0">
-          <p className="truncate font-semibold">{row.displayName}</p>
-          <p className="truncate text-xs text-ink-muted">{row.email}</p>
+          <p className="truncate font-semibold" title={row.displayName}>
+            {row.displayName}
+          </p>
+          <p className="truncate text-xs text-ink-muted" title={row.email}>
+            {row.email}
+          </p>
         </div>
       ),
     },
@@ -54,8 +58,9 @@ export default async function AdminUsersPage({
     {
       key: "reviews",
       header: "Anmeldelser",
-      width: "w-28",
-      render: (row) => <span className="tabular">{row.reviewCount ?? 0}</span>,
+      // Overskriften selv er bredere end 112px.
+      width: "w-32",
+      render: (row) => <span className="tabular">{formatNumber(row.reviewCount ?? 0)}</span>,
     },
     {
       key: "status",

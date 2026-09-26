@@ -78,7 +78,7 @@ export default async function BeveragePage({ params }: Params) {
           priority
         />
 
-        <div className="flex flex-col gap-5">
+        <div className="flex min-w-0 flex-col gap-5">
           <div>
             <div className="mb-2 flex flex-wrap items-center gap-2 text-sm">
               {beverage.brand ? (
@@ -103,7 +103,7 @@ export default async function BeveragePage({ params }: Params) {
               {beverage.vintage ? <Badge>Årgang {beverage.vintage}</Badge> : null}
             </div>
 
-            <h1 className="font-display text-4xl font-semibold leading-tight tracking-tight">
+            <h1 className="break-words font-display text-4xl font-semibold leading-tight tracking-tight">
               {beverage.name}
             </h1>
 
@@ -126,14 +126,20 @@ export default async function BeveragePage({ params }: Params) {
               >
                 Egenskaber
               </h2>
-              <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              {/*
+               * Fire spalter gav felter der var smallere end etiketter som
+               * "Serveringstemperatur", så teksten skrev sig ud over rammen.
+               */}
+              <dl className="grid grid-cols-2 gap-3 xl:grid-cols-3">
                 {beverage.attributes.map((attribute) => (
                   <div
                     key={attribute.definitionId}
                     className="rounded-[var(--radius-control)] border border-line bg-surface px-3.5 py-3"
                   >
-                    <dt className="text-xs text-ink-muted">{attribute.displayName}</dt>
-                    <dd className="font-display text-xl font-semibold">{attribute.displayValue}</dd>
+                    <dt className="break-words text-xs text-ink-muted">{attribute.displayName}</dt>
+                    <dd className="break-words font-display text-xl font-semibold">
+                      {attribute.displayValue}
+                    </dd>
                   </div>
                 ))}
               </dl>
@@ -145,7 +151,12 @@ export default async function BeveragePage({ params }: Params) {
       </div>
 
       <div className="mt-12 grid gap-10 lg:grid-cols-[20rem_1fr]">
-        {profile ? <TasteProfilePanel profile={profile} /> : <div />}
+        {/*
+         * `TasteProfilePanel` returnerer selv null uden besvarede spørgsmål, så
+         * `profile ? …` alene efterlod en tom 20rem-spalte ved siden af en
+         * sammenklemt anmeldelsesliste.
+         */}
+        {profile && profile.entries.length > 0 ? <TasteProfilePanel profile={profile} /> : <div />}
 
         <section aria-labelledby="anmeldelser">
           <h2 id="anmeldelser" className="mb-4 font-display text-xl font-semibold">
