@@ -1,10 +1,9 @@
 import type { Metadata } from "next";
 import type { AttributeDefinition } from "@maanslogen/contracts";
 import { api } from "@/lib/api/api.server";
-import { BeverageCard } from "@/components/catalog/beverage-card";
+import { BeverageList } from "@/components/catalog/beverage-list";
 import { FilterSidebar } from "@/components/catalog/filter-sidebar";
 import { ActiveFilters } from "@/components/catalog/active-filters";
-import { LoadMore } from "@/components/catalog/load-more";
 import { SortSelect } from "@/components/catalog/sort-select";
 import { EmptyState } from "@/components/ui/empty-state";
 import { attributeParams, first, type SearchParams } from "@/lib/query-state";
@@ -26,12 +25,13 @@ export default async function CatalogPage({
     q: first(params, "q"),
     categorySlug: first(params, "categorySlug"),
     typeIds: first(params, "typeIds"),
+    typeSlugs: first(params, "typeSlugs"),
     brandIds: first(params, "brandIds"),
+    brandSlugs: first(params, "brandSlugs"),
     countryCodes: first(params, "countryCodes"),
     minRating: first(params, "minRating"),
     sort: first(params, "sort") ?? "rating",
     order: first(params, "order") ?? "desc",
-    cursor: first(params, "cursor"),
     limit: 24,
     withTotal: true,
     attr: attributeParams(params),
@@ -48,6 +48,11 @@ export default async function CatalogPage({
   const categoryLabel = facets.categories.find(
     (bucket) => bucket.value === query.categorySlug,
   )?.label;
+  // Facetterne kender allerede navnet bag hver slug; chippen skal ikke
+  // hente det en gang til.
+  const typeLabels = Object.fromEntries(
+    facets.types.map((bucket) => [bucket.value, bucket.label]),
+  );
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
@@ -66,7 +71,11 @@ export default async function CatalogPage({
       </div>
 
       <div className="mb-6">
-        <ActiveFilters filterable={filterable} categoryLabel={categoryLabel} />
+        <ActiveFilters
+          filterable={filterable}
+          categoryLabel={categoryLabel}
+          typeLabels={typeLabels}
+        />
       </div>
 
       <div className="grid gap-8 lg:grid-cols-[17rem_1fr]">
@@ -79,16 +88,15 @@ export default async function CatalogPage({
               description="Prøv at fjerne et filter eller søge bredere."
             />
           ) : (
-            <>
-              <ul className="grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-4">
-                {page.items.map((beverage, index) => (
-                  <li key={beverage.id}>
-                    <BeverageCard beverage={beverage} priority={index < 4} />
-                  </li>
-                ))}
-              </ul>
-              <LoadMore cursor={page.pageInfo.nextCursor} />
-            </>
+            <BeverageList
+              // Et nyt filter er en ny liste, ikke flere af den gamle.
+              // Nøglen remounter komponenten, så de ophobede sider ryger
+              // med, i stedet for at side to af whisky hænger ved under gin.
+              key={JSON.stringify(query)}
+              initialItems={page.items}
+              initialCursor={page.pageInfo.nextCursor}
+              query={query}
+            />
           )}
         </div>
       </div>

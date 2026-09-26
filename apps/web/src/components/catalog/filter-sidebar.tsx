@@ -33,7 +33,9 @@ export function FilterSidebar({
     );
   }
 
-  const selectedTypes = (params.get("typeIds") ?? "").split(",").filter(Boolean);
+  // Facetterne svarer med slugs, så filteret skal sendes som slugs. Det er
+  // `typeSlugs`, ikke `typeIds` — sidstnævnte valideres som UUID'er.
+  const selectedTypes = (params.get("typeSlugs") ?? "").split(",").filter(Boolean);
   const selectedCountries = (params.get("countryCodes") ?? "").split(",").filter(Boolean);
 
   function toggleCsv(key: string, value: string) {
@@ -69,7 +71,7 @@ export function FilterSidebar({
               label={bucket.label}
               count={bucket.count}
               checked={selectedTypes.includes(bucket.value)}
-              onChange={() => toggleCsv("typeIds", bucket.value)}
+              onChange={() => toggleCsv("typeSlugs", bucket.value)}
             />
           ))}
         </FacetGroup>
