@@ -95,6 +95,13 @@ services:
   caddy:
     image: caddy:2-alpine
     restart: unless-stopped
+    # Caddyfile'en slår værtsnavnene op med {$...}, og Caddy læser dem fra sit
+    # eget miljø — ikke fra .env-filen compose bruger. Uden de to linjer bliver
+    # host-matcherne tomme, og Caddy nægter at starte med "module value cannot
+    # be null". Det ville tage hele routeren ned, ikke kun previews.
+    environment:
+      PROD_API_HOST: ${PROD_API_HOST}
+      DEV_API_HOST: ${DEV_API_HOST}
     volumes:
       - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy-data:/data

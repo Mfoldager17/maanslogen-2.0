@@ -1,5 +1,9 @@
 # Udrulning
 
+> Miljøerne — produktion, dev og previews pr. PR — og hvordan de sættes op:
+> [`environments.md`](environments.md). Her står detaljerne om R2, variabler
+> og selve imaget.
+
 To containere og to eksterne afhængigheder: PostgreSQL og et S3-kompatibelt
 objektlager.
 

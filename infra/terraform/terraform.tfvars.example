@@ -1,0 +1,12 @@
+# Kopiér til terraform.tfvars. Kommer ikke i git.
+#
+# Tokenet sættes hellere i miljøet end her:
+#   export CLOUDFLARE_API_TOKEN=...
+# og så udelades cloudflare_api_token nedenfor.
+
+account_id = "<konto-id fra dashboardets højre side>"
+zone_id    = "<zone-id fra domænets oversigt>"
+domain     = "maanslogen.dk"
+
+# Udelades, og så bliver det dev.<domain>.
+# dev_domain = "dev.maanslogen.dk"

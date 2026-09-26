@@ -22,7 +22,7 @@ andet er skrevet om.
 - [Hvorfor det er skrevet om](#hvorfor-det-er-skrevet-om)
 - [Kommandoer](#kommandoer)
 - [Test](#test)
-- [Udrulning](#udrulning)
+- [Miljøer og udrulning](#miljøer-og-udrulning)
 - [Dokumentation](#dokumentation)
 
 ---
@@ -152,17 +152,19 @@ side.
 
 Fra repoets rod:
 
-| Kommando                       | Gør                                  |
-| ------------------------------ | ------------------------------------ |
-| `pnpm dev`                     | Kører API og web med hot reload      |
-| `pnpm build`                   | Bygger alt                           |
-| `pnpm test`                    | Unit-tests i alle pakker             |
-| `pnpm lint` / `pnpm typecheck` | ESLint / `tsc --noEmit`              |
-| `pnpm format`                  | Prettier                             |
-| `pnpm db:migrate`              | Ny migrering ud fra schema-ændringer |
-| `pnpm db:seed`                 | Seeder (idempotent — kan køres igen) |
-| `pnpm db:studio`               | Prisma Studio                        |
-| `pnpm infra:up` / `infra:down` | Postgres og MinIO                    |
+| Kommando                       | Gør                                                      |
+| ------------------------------ | -------------------------------------------------------- |
+| `pnpm dev`                     | Kører API og web med hot reload                          |
+| `pnpm dev:web`                 | Kun web — mod dev-miljøet hvis `.env.local` peger dertil |
+| `pnpm dev:api`                 | Kun API'et                                               |
+| `pnpm build`                   | Bygger alt                                               |
+| `pnpm test`                    | Unit-tests i alle pakker                                 |
+| `pnpm lint` / `pnpm typecheck` | ESLint / `tsc --noEmit`                                  |
+| `pnpm format`                  | Prettier                                                 |
+| `pnpm db:migrate`              | Ny migrering ud fra schema-ændringer                     |
+| `pnpm db:seed`                 | Seeder (idempotent — kan køres igen)                     |
+| `pnpm db:studio`               | Prisma Studio                                            |
+| `pnpm infra:up` / `infra:down` | Postgres og MinIO                                        |
 
 I `apps/api`:
 
@@ -197,30 +199,39 @@ tilbage, og at drikkevarens gennemsnit altid stemmer med anmeldelsesrækkerne.
 
 ---
 
-## Udrulning
+## Miljøer og udrulning
 
-Begge apps har en Dockerfile med flertrins-build, der kører som ikke-root:
+To miljøer. **Produktion** kører altid: web som en Cloudflare Worker, API og
+Postgres på en Raspberry Pi bag en Cloudflare Tunnel. **Dev** opstår når et PR
+åbnes og forsvinder når det lukkes — en Worker-version og en API-container pr.
+PR, alle mod den samme dev-database med testdata.
 
 ```bash
+# Web til Workers
+cd apps/web && NEXT_PUBLIC_API_URL=https://api.maanslogen.dk pnpm cf:deploy
+
+# API'et som image
 docker build -f apps/api/Dockerfile -t maanslogen-api .
-docker build -f apps/web/Dockerfile \
-  --build-arg NEXT_PUBLIC_API_URL=https://api.maanslogen.dk \
-  -t maanslogen-web .
 ```
 
-I produktion sættes `STORAGE_DRIVER=r2` sammen med R2-nøglerne og et offentligt
-domæne foran bucketen. Konfigurationen valideres ved opstart — mangler en nøgle,
-starter processen ikke, i stedet for at fejle først når nogen rammer et endpoint.
+Konfigurationen valideres ved opstart — mangler en nøgle, starter processen
+ikke, i stedet for at fejle først når nogen rammer et endpoint.
 
-> Trin for trin, inklusive opsætning af R2: [`docs/deployment.md`](docs/deployment.md)
+Alt i Cloudflare der ikke ændrer sig — buckets, tunnel, faste DNS-navne,
+cache-reglen — ligger som Terraform i [`infra/terraform/`](infra/terraform/).
+Det der kommer og går pr. PR gør ikke, og hvorfor står samme sted.
+
+> Opsætning trin for trin: [`docs/environments.md`](docs/environments.md)
 
 ---
 
 ## Dokumentation
 
-| Dokument                                       | Handler om                                           |
-| ---------------------------------------------- | ---------------------------------------------------- |
-| [`docs/architecture.md`](docs/architecture.md) | Valgene bag API'et og frontend, og hvad de erstatter |
-| [`docs/domain-model.md`](docs/domain-model.md) | Datamodellen, felt for felt, og reglerne bag         |
-| [`docs/api.md`](docs/api.md)                   | Endpoints, paginering, filtrering og fejlformat      |
-| [`docs/deployment.md`](docs/deployment.md)     | Cloudflare R2, miljøvariabler og udrulning           |
+| Dokument                                             | Handler om                                              |
+| ---------------------------------------------------- | ------------------------------------------------------- |
+| [`docs/architecture.md`](docs/architecture.md)       | Valgene bag API'et og frontend, og hvad de erstatter    |
+| [`docs/domain-model.md`](docs/domain-model.md)       | Datamodellen, felt for felt, og reglerne bag            |
+| [`docs/api.md`](docs/api.md)                         | Endpoints, paginering, filtrering og fejlformat         |
+| [`docs/environments.md`](docs/environments.md)       | Dev og produktion, PR-previews og opsætningen af det    |
+| [`docs/deployment.md`](docs/deployment.md)           | Cloudflare R2, miljøvariabler og udrulning              |
+| [`docs/r2-omkostninger.md`](docs/r2-omkostninger.md) | Hvordan R2-forbruget holdes inden for det gratis niveau |
