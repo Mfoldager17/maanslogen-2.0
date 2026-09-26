@@ -7,3 +7,8 @@ dist
 coverage
 pnpm-lock.yaml
 apps/api/prisma/migrations
+
+# Genereres af `next build`/`next dev`, som skriver den med dobbelte
+# anførselstegn hver gang. Prettier vil have enkelte, så de to skiftedes til at
+# rette filen, og format:check afhang af hvem der kørte sidst.
+apps/web/next-env.d.ts
