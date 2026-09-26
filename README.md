@@ -41,7 +41,7 @@ cp apps/api/.env.example apps/api/.env
 cp apps/web/.env.example apps/web/.env.local
 
 pnpm db:migrate     # opretter skemaet
-pnpm db:seed        # 6 kategorier, 18 typer, 17 drikkevarer, ~50 anmeldelser
+pnpm db:seed        # 620 drikkevarer, 160 brugere, ~9.100 anmeldelser (~12 sek)
 
 pnpm dev            # API på :4000, web på :3000
 ```
@@ -152,19 +152,20 @@ side.
 
 Fra repoets rod:
 
-| Kommando                       | Gør                                                      |
-| ------------------------------ | -------------------------------------------------------- |
-| `pnpm dev`                     | Kører API og web med hot reload                          |
-| `pnpm dev:web`                 | Kun web — mod dev-miljøet hvis `.env.local` peger dertil |
-| `pnpm dev:api`                 | Kun API'et                                               |
-| `pnpm build`                   | Bygger alt                                               |
-| `pnpm test`                    | Unit-tests i alle pakker                                 |
-| `pnpm lint` / `pnpm typecheck` | ESLint / `tsc --noEmit`                                  |
-| `pnpm format`                  | Prettier                                                 |
-| `pnpm db:migrate`              | Ny migrering ud fra schema-ændringer                     |
-| `pnpm db:seed`                 | Seeder (idempotent — kan køres igen)                     |
-| `pnpm db:studio`               | Prisma Studio                                            |
-| `pnpm infra:up` / `infra:down` | Postgres og MinIO                                        |
+| Kommando                        | Gør                                                       |
+| ------------------------------- | --------------------------------------------------------- |
+| `pnpm dev`                      | Kører API og web med hot reload                           |
+| `pnpm dev:web`                  | Kun web — mod dev-miljøet hvis `.env.local` peger dertil  |
+| `pnpm dev:api`                  | Kun API'et                                                |
+| `pnpm build`                    | Bygger alt                                                |
+| `pnpm test`                     | Unit-tests i alle pakker                                  |
+| `pnpm lint` / `pnpm typecheck`  | ESLint / `tsc --noEmit`                                   |
+| `pnpm format`                   | Prettier                                                  |
+| `pnpm db:migrate`               | Ny migrering ud fra schema-ændringer                      |
+| `pnpm db:seed`                  | Seeder 620 drikkevarer og ~9.100 anmeldelser (idempotent) |
+| `SEED_SCALE=lille pnpm db:seed` | Kun de 17 håndskrevne — hurtigt                           |
+| `pnpm db:studio`                | Prisma Studio                                             |
+| `pnpm infra:up` / `infra:down`  | Postgres og MinIO                                         |
 
 I `apps/api`:
 

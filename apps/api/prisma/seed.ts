@@ -4,12 +4,41 @@ import { PrismaPg } from '@prisma/adapter-pg';
 import { Pool } from 'pg';
 import * as argon2 from 'argon2';
 import { slugify } from '@maanslogen/contracts';
+import {
+  antalAnmeldelser,
+  anmeldelsestekst,
+  attributvaerdier,
+  bedoemmelse,
+  drikkevarenavn,
+  heltal,
+  land,
+  maerkenavn,
+  person,
+  tilfaeldig,
+  uuid,
+  vaelg,
+} from './seed-generator';
 
 /**
  * Idempotent seed: kan køres igen og igen uden at duplikere noget.
  * 1.0's seed startede med at tømme samtlige tabeller — hvilket gør den
  * uanvendelig mod alt andet end en tom udviklingsdatabase.
  */
+
+/**
+ * `lille` giver kun de 17 håndskrevne drikkevarer — hurtigt, til når man bare
+ * skal have noget at se på. `stor` lægger et genereret katalog oven i, så
+ * paginering, facettællinger og smagsprofiler bliver afprøvet med mængder der
+ * ligner virkeligheden.
+ */
+const SKALA = (process.env.SEED_SCALE ?? 'stor').toLowerCase();
+const STOR = SKALA !== 'lille';
+
+const MAAL = {
+  maerker: 60,
+  drikkevarer: 620,
+  brugere: 160,
+};
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 const prisma = new PrismaClient({ adapter: new PrismaPg(pool) });
@@ -501,6 +530,298 @@ async function upsertUser(
   });
 }
 
+/**
+ * Lægger et genereret katalog oven i det håndskrevne.
+ *
+ * Alt går gennem `createMany` med `skipDuplicates`. Den håndskrevne del laver
+ * ét Prisma-kald pr. anmeldelse og pr. svar, hvilket er fint ved 50 — ved
+ * titusinder ville det tage evigheder. Og `skipDuplicates` er det der holder
+ * seeden idempotent: anden kørsel skriver ingenting.
+ */
+async function genererStortKatalog(): Promise<void> {
+  const rng = tilfaeldig(20260926);
+  console.log('\nGenererer det store katalog …');
+
+  const kategorier = await prisma.beverageCategory.findMany({
+    where: { deletedAt: null },
+    select: { id: true, name: true, types: { select: { id: true, name: true } } },
+  });
+
+  // ---- Mærker ----
+  const maerkerFoer = await prisma.brand.count();
+  const nyeMaerker: Prisma.BrandCreateManyInput[] = [];
+  const brugteSlugs = new Set(
+    (await prisma.brand.findMany({ select: { slug: true } })).map((b) => b.slug),
+  );
+  let maerkeVagt = 0;
+  while (maerkerFoer + nyeMaerker.length < MAAL.maerker && maerkeVagt < MAAL.maerker * 40) {
+    maerkeVagt += 1;
+    const kategori = vaelg(rng, kategorier);
+    const navn = maerkenavn(rng, kategori.name);
+    const slug = slugify(navn);
+    if (brugteSlugs.has(slug)) continue;
+    brugteSlugs.add(slug);
+    nyeMaerker.push({ id: uuid(rng), name: navn, slug, countryCode: land(rng) });
+  }
+  if (nyeMaerker.length) {
+    await prisma.brand.createMany({ data: nyeMaerker, skipDuplicates: true });
+  }
+  const alleMaerker = await prisma.brand.findMany({ select: { id: true } });
+  console.log(`  ${alleMaerker.length} mærker i alt`);
+
+  // ---- Drikkevarer ----
+  const drikkeFoer = await prisma.beverage.count();
+  const brugteDrikSlugs = new Set(
+    (await prisma.beverage.findMany({ select: { slug: true } })).map((b) => b.slug),
+  );
+  // Prismas egen type plus de to felter generatoren skal bruge bagefter.
+  // Skrev jeg felterne selv, ville en forkert kolonne først vise sig ved
+  // kørsel — og det gjorde den: `country` findes ikke, det hedder countryCode.
+  // `id` er valgfri i Prismas type fordi kolonnen har en default, men vi
+  // sætter den altid selv — den skal bruges til anmeldelser og attributter.
+  type NyDrik = Prisma.BeverageCreateManyInput & {
+    id: string;
+    kategori: string;
+    typeNavn: string;
+  };
+  const nyeDrikke: NyDrik[] = [];
+  let drikVagt = 0;
+  while (drikkeFoer + nyeDrikke.length < MAAL.drikkevarer && drikVagt < MAAL.drikkevarer * 40) {
+    drikVagt += 1;
+    const kategori = vaelg(rng, kategorier);
+    if (!kategori.types.length) continue;
+    const type = vaelg(rng, kategori.types);
+    const maerke = vaelg(rng, alleMaerker);
+    const navn = drikkevarenavn(rng, kategori.name, type.name);
+    const slug = slugify(`${navn} ${type.name} ${nyeDrikke.length}`);
+    if (brugteDrikSlugs.has(slug)) continue;
+    brugteDrikSlugs.add(slug);
+    nyeDrikke.push({
+      id: uuid(rng),
+      name: navn,
+      slug,
+      typeId: type.id,
+      brandId: maerke.id,
+      description: `${navn} — en ${type.name.toLowerCase()} der er værd at smage på.`,
+      kategori: kategori.name,
+      typeNavn: type.name,
+    });
+  }
+  if (nyeDrikke.length) {
+    await prisma.beverage.createMany({
+      data: nyeDrikke.map((d) => ({
+        id: d.id,
+        name: d.name,
+        slug: d.slug,
+        typeId: d.typeId,
+        brandId: d.brandId,
+        description: d.description,
+      })),
+      skipDuplicates: true,
+    });
+  }
+  console.log(`  ${drikkeFoer + nyeDrikke.length} drikkevarer i alt`);
+
+  // ---- Attributværdier ----
+  const definitioner = await prisma.attributeDefinition.findMany({
+    where: { deletedAt: null },
+    select: { id: true, key: true },
+  });
+  const defEfterNoegle = new Map(definitioner.map((d) => [d.key, d]));
+  const attrRaekker: Prisma.BeverageAttributeValueCreateManyInput[] = [];
+  for (const drik of nyeDrikke) {
+    const vaerdier = attributvaerdier(rng, drik.kategori, drik.typeNavn);
+    for (const [noegle, vaerdi] of Object.entries(vaerdier)) {
+      const def = defEfterNoegle.get(noegle);
+      if (!def) continue;
+      attrRaekker.push({
+        beverageId: drik.id,
+        definitionId: def.id,
+        valueText: typeof vaerdi === 'string' ? vaerdi : null,
+        valueNumber: typeof vaerdi === 'number' ? vaerdi : null,
+        valueBoolean: typeof vaerdi === 'boolean' ? vaerdi : null,
+        ...(Array.isArray(vaerdi) ? { valueJson: vaerdi } : {}),
+      });
+    }
+  }
+  await iBidder(attrRaekker, (bid) =>
+    prisma.beverageAttributeValue.createMany({ data: bid, skipDuplicates: true }),
+  );
+  console.log(`  ${attrRaekker.length} attributværdier`);
+
+  // ---- Brugere ----
+  // Ét argon2-hash genbruges til alle genererede. At hashe 150 gange tager
+  // over et halvt minut, og de er alligevel testbrugere med samme kodeord.
+  const brugereFoer = await prisma.user.count();
+  const faellesHash = await argon2.hash('Maanslogen-Test-1', { type: argon2.argon2id });
+  const nyeBrugere: Prisma.UserCreateManyInput[] = [];
+  const brugteEmails = new Set(
+    (await prisma.user.findMany({ select: { email: true } })).map((u) => u.email),
+  );
+  let brugerVagt = 0;
+  while (brugereFoer + nyeBrugere.length < MAAL.brugere && brugerVagt < MAAL.brugere * 40) {
+    brugerVagt += 1;
+    const { navn, email } = person(rng, brugereFoer + nyeBrugere.length + 1);
+    if (brugteEmails.has(email)) continue;
+    brugteEmails.add(email);
+    nyeBrugere.push({
+      id: uuid(rng),
+      email,
+      displayName: navn,
+      passwordHash: faellesHash,
+      role: 'USER',
+    });
+  }
+  if (nyeBrugere.length) {
+    await prisma.user.createMany({ data: nyeBrugere, skipDuplicates: true });
+  }
+  const anmeldere = await prisma.user.findMany({
+    where: { role: 'USER', deletedAt: null },
+    select: { id: true },
+  });
+  console.log(`  ${brugereFoer + nyeBrugere.length} brugere i alt`);
+
+  // ---- Anmeldelser og svar ----
+  const spoergsmaal = await prisma.question.findMany({
+    where: { deletedAt: null, active: true },
+    select: { id: true, answerType: true, options: true, categories: { select: { id: true } } },
+  });
+  const spgEfterKategori = new Map<string, typeof spoergsmaal>();
+  const kategoriEfterType = new Map<string, string>();
+  for (const kategori of kategorier) {
+    spgEfterKategori.set(
+      kategori.id,
+      spoergsmaal.filter(
+        (q) => q.categories.length === 0 || q.categories.some((c) => c.id === kategori.id),
+      ),
+    );
+    for (const type of kategori.types) kategoriEfterType.set(type.id, kategori.id);
+  }
+
+  const anmeldelser: Prisma.ReviewCreateManyInput[] = [];
+  const svar: Prisma.ReviewAnswerCreateManyInput[] = [];
+
+  for (const drik of nyeDrikke) {
+    const antal = antalAnmeldelser(rng, anmeldere.length);
+    if (antal === 0) continue;
+    const kategoriId = kategoriEfterType.get(drik.typeId);
+    const relevante = kategoriId ? (spgEfterKategori.get(kategoriId) ?? []) : [];
+
+    // Bland anmelderne og tag de første N, så ingen anmelder den samme
+    // drikkevare to gange — tabellen har unique(userId, beverageId).
+    const blandet = [...anmeldere];
+    for (let i = blandet.length - 1; i > 0; i -= 1) {
+      const j = Math.floor(rng() * (i + 1));
+      const a = blandet[i];
+      const b = blandet[j];
+      if (a && b) {
+        blandet[i] = b;
+        blandet[j] = a;
+      }
+    }
+
+    for (const anmelder of blandet.slice(0, antal)) {
+      const anmeldelseId = uuid(rng);
+      anmeldelser.push({
+        id: anmeldelseId,
+        userId: anmelder.id,
+        beverageId: drik.id,
+        rating: bedoemmelse(rng),
+        body: anmeldelsestekst(rng),
+        createdAt: new Date(Date.now() - heltal(rng, 0, 900) * 86_400_000),
+      });
+
+      for (const q of relevante) {
+        const valg = (q.options as { value: string }[] | null) ?? [];
+        switch (q.answerType) {
+          case 'SCALE':
+            svar.push({ reviewId: anmeldelseId, questionId: q.id, valueNumber: heltal(rng, 1, 5) });
+            break;
+          case 'BOOLEAN':
+            svar.push({ reviewId: anmeldelseId, questionId: q.id, valueBoolean: rng() < 0.72 });
+            break;
+          case 'SELECT':
+            if (valg.length) {
+              svar.push({
+                reviewId: anmeldelseId,
+                questionId: q.id,
+                valueText: vaelg(rng, valg).value,
+              });
+            }
+            break;
+          case 'MULTI_SELECT': {
+            const valgte = valg.filter(() => rng() < 0.4).map((o) => o.value);
+            if (valgte.length) {
+              svar.push({
+                reviewId: anmeldelseId,
+                questionId: q.id,
+                valueJson: valgte,
+              });
+            }
+            break;
+          }
+          default:
+            if (rng() < 0.5) {
+              svar.push({
+                reviewId: anmeldelseId,
+                questionId: q.id,
+                valueText: anmeldelsestekst(rng),
+              });
+            }
+        }
+      }
+    }
+  }
+
+  await iBidder(anmeldelser, (bid) =>
+    prisma.review.createMany({ data: bid, skipDuplicates: true }),
+  );
+  console.log(`  ${anmeldelser.length} anmeldelser`);
+  await iBidder(svar, (bid) => prisma.reviewAnswer.createMany({ data: bid, skipDuplicates: true }));
+  console.log(`  ${svar.length} svar på spørgsmål`);
+
+  await genberegnBedoemmelser();
+}
+
+/** createMany har en øvre grænse for hvor mange parametre der kan sendes ad gangen. */
+async function iBidder<T>(raekker: T[], skriv: (bid: T[]) => Promise<unknown>): Promise<void> {
+  const STOERRELSE = 2_000;
+  for (let i = 0; i < raekker.length; i += STOERRELSE) {
+    await skriv(raekker.slice(i, i + STOERRELSE));
+  }
+}
+
+/**
+ * Gennemsnit, antal og fordeling for alle drikkevarer på én gang.
+ *
+ * Den håndskrevne del gør det med en groupBy pr. drikkevare. Ved 620 stykker
+ * er det 620 forespørgsler for noget databasen kan klare i én.
+ */
+async function genberegnBedoemmelser(): Promise<void> {
+  await prisma.$executeRawUnsafe(`
+    UPDATE beverages b SET
+      rating_average = COALESCE(s.gennemsnit, 0),
+      rating_count   = COALESCE(s.antal, 0),
+      rating_buckets = COALESCE(s.fordeling, '{"1":0,"2":0,"3":0,"4":0,"5":0}'::jsonb)
+    FROM (
+      SELECT r.beverage_id,
+             ROUND(AVG(r.rating)::numeric, 4)::float8 AS gennemsnit,
+             COUNT(*)::int AS antal,
+             jsonb_build_object(
+               '1', COUNT(*) FILTER (WHERE ROUND(r.rating) = 1),
+               '2', COUNT(*) FILTER (WHERE ROUND(r.rating) = 2),
+               '3', COUNT(*) FILTER (WHERE ROUND(r.rating) = 3),
+               '4', COUNT(*) FILTER (WHERE ROUND(r.rating) = 4),
+               '5', COUNT(*) FILTER (WHERE ROUND(r.rating) = 5)
+             ) AS fordeling
+      FROM reviews r
+      WHERE r.deleted_at IS NULL
+      GROUP BY r.beverage_id
+    ) s
+    WHERE b.id = s.beverage_id;
+  `);
+}
+
 async function main(): Promise<void> {
   console.log('Seeder database …');
 
@@ -825,6 +1146,8 @@ async function main(): Promise<void> {
     });
   }
   console.log(`  ${reviewCount} nye anmeldelser`);
+
+  if (STOR) await genererStortKatalog();
 
   console.log('\nFærdig. Log ind i admin med:');
   console.log('  admin@maanslogen.dk / Maanslogen-Admin-1   (ADMIN)');

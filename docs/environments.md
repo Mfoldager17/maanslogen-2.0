@@ -450,7 +450,8 @@ sudo -u maanslogen /opt/maanslogen/infra/pi/nulstil-dev-db.sh
 ```
 
 Den beder om bekræftelse, dropper skemaet, kører alle migreringer igen og
-seeder forfra.
+seeder forfra — omkring 620 drikkevarer og 9.100 anmeldelser, hvilket tager
+et halvt minut.
 
 > Nulstillingen kalder `prisma db seed` som et **selvstændigt** trin efter
 > `migrate reset`. Prisma 6 seedede selv til sidst; Prisma 7 gør det ikke, og
