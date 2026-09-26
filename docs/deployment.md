@@ -11,9 +11,9 @@ objektlager.
 
 ## Cloudflare R2
 
-R2 blev valgt frem for selvhostet MinIO af tre grunde: ingen egress-omkostninger,
-CDN uden ekstra opsætning, og en S3-kompatibel API, så udvikling kan køre på
-MinIO med nøjagtig den samme kode.
+R2 blev valgt frem for et selvhostet objektlager af tre grunde: ingen
+egress-omkostninger, CDN uden ekstra opsætning, og en S3-kompatibel API, så
+udvikling kan køre mod en lokal S3-server med nøjagtig den samme kode.
 
 ### Opsætning
 

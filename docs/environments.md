@@ -397,7 +397,7 @@ Højst tre previews kører ad gangen (`MAX_PREVIEWS`). Hver tager omkring
 
 ## Lokalt
 
-**Alt lokalt** — standarden. Postgres og MinIO i Docker, ingen afhængighed af
+**Alt lokalt** — standarden. Postgres og en S3-server i Docker, ingen afhængighed af
 noget udefra:
 
 ```bash
@@ -413,7 +413,7 @@ pnpm dev:web
 ```
 
 Hot reload som normalt, men data, indlogning og billeder kommer fra
-dev-API'et. Postgres og MinIO behøver ikke køre. Tilbage igen med
+dev-API'et. Postgres og S3-serveren behøver ikke køre. Tilbage igen med
 `cp apps/web/.env.example apps/web/.env.local`.
 
 **Lokalt API mod dev-databasen** — når fejlen er i API-koden, men data skal

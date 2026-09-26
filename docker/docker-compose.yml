@@ -1,16 +1,20 @@
-# Lokal infrastruktur: PostgreSQL og MinIO.
+# Lokal infrastruktur: PostgreSQL og en S3-server.
 #
-# MinIO taler samme S3-API som Cloudflare R2, så API'et kører med præcis den
+# S3-serveren taler samme API som Cloudflare R2, så API'et kører med præcis den
 # samme kode lokalt og i produktion — kun STORAGE_DRIVER og nøglerne skifter.
 #
-# Images hentes fra quay.io og ikke Docker Hub. MinIO slettede minio/minio og
-# minio/mc fra Docker Hub den 11. september 2026, og et `docker compose up`
-# fejler derfor med "pull access denied ... repository does not exist".
+# Her stod MinIO indtil september 2026, hvor MinIO slettede minio/minio og
+# minio/mc fra Docker Hub. quay.io holdt heller ikke: de tags der findes
+# omtalt, svarer 401 på manifestet.
 #
-# Tags er låst fast. quay.io serverer stadig de gamle udgaver, men de er
-# frosne — sidste frie udgivelse er fra september 2025 — så `latest` er ikke
-# noget at regne med her. Til en lokal udviklingsopsætning er det fint; det er
-# produktionen der kører på R2.
+# Valget faldt på LocalStack frem for adobe/s3mock, som ellers er en femtedel
+# så stor. Grunden er presignede URL'er. s3mock skriver selv at den tager imod
+# dem uden at validere signatur, udløb eller HTTP-verbum — og hele vores
+# upload-sti hviler på netop dem. En fejl i vores presign ville altså virke
+# lokalt og først vise sig mod R2. Det er den slags fejl der er dyrest.
+#
+# LocalStack lytter på 4566 indeni, men udstilles på 9000 udadtil, så
+# .env-filer, tests og next.config kan blive som de er.
 
 name: maanslogen
 
@@ -32,41 +36,30 @@ services:
       timeout: 5s
       retries: 10
 
-  minio:
-    image: quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z
+  # Bemærk: gratisudgaven gemmer ikke data på tværs af `infra:down`. Det er
+  # til at leve med her — seeden opretter ingen billeder, så det eneste der
+  # går tabt, er hvad du selv har uploadet mens du testede.
+  s3:
+    image: localstack/localstack:2026.08.4
     restart: unless-stopped
-    command: server /data --console-address ":9001"
     environment:
-      MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: minioadmin
+      SERVICES: s3
+      DEBUG: "0"
+      # Nøglerne er vilkårlige, men skal matche apps/api/.env.
+      AWS_ACCESS_KEY_ID: minioadmin
+      AWS_SECRET_ACCESS_KEY: minioadmin
+      AWS_DEFAULT_REGION: us-east-1
     ports:
-      - "9000:9000"   # S3-API
-      - "9001:9001"   # Konsol
+      - "9000:4566"
     volumes:
-      - minio-data:/data
+      # Scriptet køres når LocalStack melder sig klar, og opretter de to
+      # buckets. Derfor er der ingen init-container mere.
+      - ./localstack-buckets.sh:/etc/localstack/init/ready.d/buckets.sh:ro
     healthcheck:
-      test: ["CMD", "mc", "ready", "local"]
+      test: ["CMD-SHELL", "awslocal s3 ls >/dev/null 2>&1"]
       interval: 5s
       timeout: 5s
-      retries: 10
-
-  # Opretter bucketen og gør den offentligt læsbar, så billed-URL'er virker
-  # ligesom et R2-bucket med et offentligt domæne foran.
-  minio-init:
-    image: quay.io/minio/mc:RELEASE.2025-08-13T08-35-41Z
-    depends_on:
-      minio:
-        condition: service_healthy
-    entrypoint: >
-      /bin/sh -c "
-      mc alias set local http://minio:9000 minioadmin minioadmin &&
-      mc mb --ignore-existing local/maanslogen-dev &&
-      mc anonymous set download local/maanslogen-dev &&
-      mc mb --ignore-existing local/maanslogen-test &&
-      mc anonymous set download local/maanslogen-test &&
-      echo 'Buckets klar.'
-      "
+      retries: 20
 
 volumes:
   postgres-data:
-  minio-data:

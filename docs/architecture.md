@@ -21,7 +21,7 @@ vundet.
                                │                 │
                       ┌────────▼──────┐   ┌──────▼────────────┐
                       │ PostgreSQL 17 │   │ Cloudflare R2     │
-                      │               │   │ (MinIO lokalt)    │
+                      │               │   │ (LocalStack lokalt)│
                       └───────────────┘   └───────────────────┘
 
                     packages/contracts (Zod) bruges af begge
@@ -222,7 +222,7 @@ Klienten kan hverken vælge bucket eller sti, så en manipuleret forespørgsel k
 ikke overskrive et andet objekt.
 
 Produktionen kører på **Cloudflare R2**: ingen egress-omkostninger, indbygget CDN
-og S3-kompatibel API. Lokalt kører MinIO på samme API, så koden er identisk —
+og S3-kompatibel API. Lokalt kører LocalStack på samme API, så koden er identisk —
 kun `STORAGE_DRIVER` og nøglerne skifter.
 
 ### Uploadforløbet

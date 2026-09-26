@@ -29,12 +29,12 @@ andet er skrevet om.
 
 ## Kom i gang
 
-Forudsætninger: **Node 22+**, **pnpm 10+** og **Docker** (til Postgres og MinIO).
+Forudsætninger: **Node 22+**, **pnpm 10+** og **Docker** (til Postgres og S3).
 
 ```bash
 pnpm install
 
-# Postgres på 5432 og MinIO på 9000 (S3-API) / 9001 (konsol)
+# Postgres på 5432 og en S3-server på 9000
 pnpm infra:up
 
 cp apps/api/.env.example apps/api/.env
@@ -70,7 +70,7 @@ maanslogen-2.0/
 ├── packages/
 │   ├── contracts/    Zod-skemaer: én kilde til sandhed for API og web
 │   └── tsconfig/     Delte TypeScript-konfigurationer
-└── docker/           Postgres + MinIO til udvikling
+└── docker/           Postgres + S3-server til udvikling
 ```
 
 ### `packages/contracts` er omdrejningspunktet
@@ -129,20 +129,20 @@ side.
 
 1.0 havde en god idé og en implementering der ikke bar den. Det væsentlige:
 
-|                      | 1.0                                                                                                   | 2.0                                                                                                      |
-| -------------------- | ----------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| **Autentificering**  | Fandtes ikke. Hele admin-API'et lå åbent.                                                             | argon2id, JWT med tokenVersion-tjek, rullende refresh-tokens med tyveridetektion, rollestyring           |
-| **Validering**       | DTO'er med class-validator, men `ValidationPipe` blev aldrig registreret — intet input blev valideret | Zod-skemaer delt med frontend, håndhævet på hvert kald                                                   |
-| **Filtrering**       | Alle drikkevarer blev hentet og filtreret i browseren                                                 | Filtrering, søgning, sortering og facettællinger i databasen                                             |
-| **Paginering**       | Ingen                                                                                                 | Cursor-paginering hele vejen igennem                                                                     |
-| **Fejl**             | Tre forskellige formater afhængigt af hvor fejlen opstod                                              | RFC 9457 Problem Details, ét format                                                                      |
-| **Typer i frontend** | Genereret klient checket ind i repoet, drev fra API'et, nogle endpoints håndkodet udenom              | Typerne udledes af de delte skemaer; ingen kodegenerering                                                |
-| **Bedømmelser**      | Gennemsnittet blev justeret ad hoc og kunne drive fra anmeldelserne                                   | Genberegnes fra rækkerne i samme transaktion                                                             |
-| **Objektlager**      | Selvhostet MinIO. Et cron-job listede alle buckets og slettede de tomme                               | Cloudflare R2 i produktion, MinIO lokalt, samme kode. Oprydning rører kun nøgler API'et selv har udstedt |
-| **Kategori-ikoner**  | Gemt som en `Image`-række med emojien i `url`-feltet                                                  | Et `icon`-felt                                                                                           |
-| **Billeder**         | Hver størrelse var en løsrevet række uden sammenhæng                                                  | `MediaAsset` med `MediaRendition`-varianter og alt-tekst                                                 |
-| **Controllere**      | Parallelle `admin/`- og `web/`-controllere med hver sit DTO-sæt for samme data                        | Ét sæt endpoints; læsning offentlig, skrivning rollebeskyttet                                            |
-| **Test**             | Ingen                                                                                                 | 132: kontrakter, unit og e2e mod en rigtig Postgres                                                      |
+|                      | 1.0                                                                                                   | 2.0                                                                                                           |
+| -------------------- | ----------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| **Autentificering**  | Fandtes ikke. Hele admin-API'et lå åbent.                                                             | argon2id, JWT med tokenVersion-tjek, rullende refresh-tokens med tyveridetektion, rollestyring                |
+| **Validering**       | DTO'er med class-validator, men `ValidationPipe` blev aldrig registreret — intet input blev valideret | Zod-skemaer delt med frontend, håndhævet på hvert kald                                                        |
+| **Filtrering**       | Alle drikkevarer blev hentet og filtreret i browseren                                                 | Filtrering, søgning, sortering og facettællinger i databasen                                                  |
+| **Paginering**       | Ingen                                                                                                 | Cursor-paginering hele vejen igennem                                                                          |
+| **Fejl**             | Tre forskellige formater afhængigt af hvor fejlen opstod                                              | RFC 9457 Problem Details, ét format                                                                           |
+| **Typer i frontend** | Genereret klient checket ind i repoet, drev fra API'et, nogle endpoints håndkodet udenom              | Typerne udledes af de delte skemaer; ingen kodegenerering                                                     |
+| **Bedømmelser**      | Gennemsnittet blev justeret ad hoc og kunne drive fra anmeldelserne                                   | Genberegnes fra rækkerne i samme transaktion                                                                  |
+| **Objektlager**      | Selvhostet MinIO. Et cron-job listede alle buckets og slettede de tomme                               | Cloudflare R2 i produktion, LocalStack lokalt, samme kode. Oprydning rører kun nøgler API'et selv har udstedt |
+| **Kategori-ikoner**  | Gemt som en `Image`-række med emojien i `url`-feltet                                                  | Et `icon`-felt                                                                                                |
+| **Billeder**         | Hver størrelse var en løsrevet række uden sammenhæng                                                  | `MediaAsset` med `MediaRendition`-varianter og alt-tekst                                                      |
+| **Controllere**      | Parallelle `admin/`- og `web/`-controllere med hver sit DTO-sæt for samme data                        | Ét sæt endpoints; læsning offentlig, skrivning rollebeskyttet                                                 |
+| **Test**             | Ingen                                                                                                 | 132: kontrakter, unit og e2e mod en rigtig Postgres                                                           |
 
 > Det fulde regnskab: [`docs/architecture.md`](docs/architecture.md)
 
@@ -165,7 +165,7 @@ Fra repoets rod:
 | `pnpm db:seed`                  | Seeder 620 drikkevarer og ~9.100 anmeldelser (idempotent) |
 | `SEED_SCALE=lille pnpm db:seed` | Kun de 17 håndskrevne — hurtigt                           |
 | `pnpm db:studio`                | Prisma Studio                                             |
-| `pnpm infra:up` / `infra:down`  | Postgres og MinIO                                         |
+| `pnpm infra:up` / `infra:down`  | Postgres og S3-serveren                                   |
 
 I `apps/api`:
 
