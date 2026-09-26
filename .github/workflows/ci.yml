@@ -75,6 +75,14 @@ jobs:
         env:
           NEXT_PUBLIC_API_URL: http://localhost:4000
 
+      # Produktionen kører på Workers, så den sti skal også bygge. `next build`
+      # ovenfor siger intet om hvorvidt adapteren kan pakke resultatet.
+      - name: Byg web til Cloudflare Workers
+        working-directory: apps/web
+        env:
+          NEXT_PUBLIC_API_URL: http://localhost:4000
+        run: pnpm cf:build
+
   docker:
     name: Docker-images kan bygges
     runs-on: ubuntu-latest
