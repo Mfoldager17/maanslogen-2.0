@@ -4,38 +4,35 @@ To miljøer. **Produktion** kører altid. **Dev** findes kun så længe der er e
 åbent PR — eller så længe du selv har noget kørende lokalt.
 
 ```
-                 ┌─────────────────────────────┐
-  maanslogen.dk  │  Worker (web)               │
-                 └──────────────┬──────────────┘
-                                │  fetch
-                 ┌──────────────▼──────────────┐
- api.maanslogen. │  Cloudflare Tunnel → Pi'en  │
- dk              │  Caddy → api → postgres     │
-                 └─────────────────────────────┘
-
-  PR #42 åbnes
-                 ┌─────────────────────────────┐
- pr-42-…workers. │  Worker-version (web)       │
- dev             └──────────────┬──────────────┘
-                                │
-                 ┌──────────────▼──────────────┐
- api-pr-42.dev.  │  Samme tunnel, samme Caddy  │
- maanslogen.dk   │  → container pr. PR         │
-                 └──────────────┬──────────────┘
-                                │
-                 ┌──────────────▼──────────────┐
-                 │  maanslogen_dev — fælles     │
-                 │  testdata, deles med lokal   │
-                 └─────────────────────────────┘
+GitHub-hosted runner            Cloudflare             Pi'en
+────────────────────            ──────────             ─────────────────────
+ubuntu-24.04-arm                Workers (web)          Postgres
+  bygger arm64-image              maanslogen.dk          · maanslogen
+       │                               │                  · maanslogen_dev
+       ▼                               │ fetch
+     GHCR                              ▼                 api        (prod)
+  · :main                         Tunnel ─► Caddy ─►     api-dev    (main)
+  · :pr-42                                               api-pr-42  (preview)
+       │                                                      ▲
+       │   Pi'en spørger hvert andet minut:                   │
+       │     · hvilke åbne PR'er har label "preview"?          │
+       │     · er der et nyt :main-image?                      │
+       └───────────────────────────────────────────►  maanslogen-agent
 ```
 
-|          | Produktion              | Dev                                 |
-| -------- | ----------------------- | ----------------------------------- |
-| Web      | Worker `maanslogen-web` | Worker-**version** pr. PR, egen URL |
-| API      | Container på Pi'en      | Container pr. PR + ét delt dev-API  |
-| Database | `maanslogen`            | `maanslogen_dev` — **én, fælles**   |
-| Billeder | `maanslogen-media`      | `maanslogen-media-dev`              |
-| Lever    | Altid                   | Mens PR'et er åbent                 |
+**Intet skubber til Pi'en.** Der er ingen selvhostet GitHub-runner. Pi'en
+spørger selv og udfører kun `docker pull` og `docker run` med argumenter, den
+selv bestemmer ud fra kode der ligger på `main`. Se
+[`infra/pi/agent/`](../infra/pi/agent/).
+
+|          | Produktion              | Dev                                        |
+| -------- | ----------------------- | ------------------------------------------ |
+| Web      | Worker `maanslogen-web` | Worker-**version** pr. PR, egen URL        |
+| API      | Container på Pi'en      | Container pr. PR + ét delt dev-API         |
+| Database | `maanslogen`            | `maanslogen_dev` — **én, fælles**          |
+| Billeder | `maanslogen-media`      | `maanslogen-media-dev`                     |
+| Opstår   | Push til `main`         | Når label'en `preview` sættes              |
+| Lever    | Altid                   | Indtil label'en fjernes eller PR'et lukkes |
 
 ---
 
@@ -161,38 +158,56 @@ docker run --rm --network maanslogen -e DATABASE_URL="$dev_url" \
   maanslogen-api:dev ./node_modules/.bin/prisma db seed
 ```
 
-### 3. GitHub-runneren på Pi'en
+### 3. Agenten på Pi'en
 
-Workflows skal kunne starte containere på Pi'en. En selvhostet runner henter
-selv sit arbejde, så der skal ikke åbnes noget indad.
+Pi'en skal kunne starte containere ud fra det GitHub siger. Det gøres **ikke**
+med en selvhostet runner: den ville få tilsendt workflow-kode og udføre den
+som en shell på maskinen, og på et offentligt repo kan enhver åbne et PR.
 
-_Settings → Actions → Runners → New self-hosted runner_, følg trinnene, og giv
-den labels `self-hosted` og **`maanslogen-pi`** — workflowsene beder om netop
-den. Installér den som tjeneste med `./svc.sh install && ./svc.sh start`, så
-den overlever en genstart.
+I stedet spørger Pi'en selv.
 
-> **Vigtigt, fordi repoet er offentligt.** En selvhostet runner kører
-> workflow-kode på din maskine derhjemme, og alle kan forke et offentligt repo
-> og åbne et PR. GitHub fraråder direkte den kombination.
+```bash
+sudo useradd -r -G docker -s /usr/sbin/nologin maanslogen
+sudo git clone https://github.com/Mfoldager17/maanslogen-2.0 /opt/maanslogen
+sudo cp /opt/maanslogen/infra/pi/agent/maanslogen-agent.{service,timer} /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now maanslogen-agent.timer
+```
+
+`/opt/maanslogen` skal blive på `main` — det er den klon agenten kører fra, og
+pointen er netop at et PR ikke kan ændre den:
+
+```bash
+cd /opt/maanslogen && sudo git pull origin main
+```
+
+Følg med:
+
+```bash
+journalctl -u maanslogen-agent -f
+sudo systemctl start maanslogen-agent    # kør med det samme
+```
+
+> **Hvorfor det er forsvarligt på et offentligt repo.** Tre ting skal være
+> opfyldt, før et PR får en container, og de er uafhængige af hinanden:
 >
-> Derfor står der på både `api`- og `web`-jobbet i `preview.yml`:
+> 1. **Der findes et image i GHCR.** Et PR fra en fork får et skrivebeskyttet
+>    `GITHUB_TOKEN` og kan derfor ikke lægge et image op. Det er ikke en regel
+>    vi håndhæver — det er noget en fork ikke _kan_.
+> 2. **PR'et har label'en `preview`**, og labels kan kun sættes af nogen med
+>    skriveadgang. Et tilfældigt PR udefra gør altså ingenting, før du selv
+>    beder om det.
+> 3. **Grenen ligger i repoet selv.** Tjekkes både i workflowet og i agenten.
 >
-> ```yaml
-> if: github.event.pull_request.head.repo.full_name == github.repository
-> ```
+> Og skulle noget alligevel komme igennem: containeren kører uden skrivbart
+> rodfilsystem, uden capabilities, uden rettighedsforfremmelse, med loft på
+> hukommelse og processer, på et netværk hvor produktions-API'et ikke er, og
+> med en databaserolle der ikke har CONNECT på produktionsdatabasen. Den kører
+> PR-kode, men den kører den i en spændetrøje.
 >
-> Det er sandt kun når grenen ligger i repoet selv, hvilket kræver
-> push-adgang; en fork har et andet navn, og GitHub afviser jobbet før der
-> tildeles en runner. **Fjern ikke de to linjer** — de er det eneste der står
-> mellem en fremmed og Pi'en.
->
-> Sæt derudover _Settings → Actions → General → Fork pull request workflows
-> from outside collaborators_ til **Require approval for all external
-> collaborators**.
->
-> Vil du lukke hullet helt, så gør repoet privat. Det koster
-> Actions-minutter (se [Hvad det koster](#hvad-det-koster)), men så kan ingen
-> fork udløse noget overhovedet.
+> Forskellen til en runner er værd at holde fast i: en runner giver PR-kode en
+> **shell på værten**, med adgang til hemmelighedsfilen og docker-socket — og
+> docker-socket er reelt root. En container er en helt almindelig sandkasse.
 
 ### 4. Hemmeligheder og variabler i GitHub
 
@@ -232,24 +247,30 @@ den. Derefter klarer `deploy.yml` det ved hvert push til `main`.
 
 ## Sådan kører et PR
 
-1. Du åbner et PR.
-2. `preview.yml` bygger web'en med `NEXT_PUBLIC_API_URL` sat til
-   `https://api-pr-<n>.dev.maanslogen.dk` og lægger den op som en version med
-   aliaset `pr-<n>`. Samtidig bygger runneren på Pi'en API-imaget, migrerer
-   dev-databasen og starter `maanslogen-api-pr-<n>`.
-3. DNS-navnet oprettes og peger ind i tunnelen. Caddy ser `api-pr-42.` i
-   Host-headeren og sender videre til `maanslogen-api-pr-42:4000` — hverken
-   tunnel eller Caddy skal røres.
-4. En kommentar på PR'et får adresserne. Nye commits opdaterer den samme
+1. Du åbner et PR. **Der sker ingenting endnu.**
+2. Du sætter label'en `preview`. Det er porten, og den kan kun åbnes af nogen
+   med skriveadgang.
+3. `preview.yml` bygger API-imaget på en `ubuntu-24.04-arm`-runner — native
+   arm64, og gratis på et offentligt repo — og lægger det i GHCR som
+   `:pr-<n>`. Samtidig bygges web'en og lægges op som en Worker-version med
+   aliaset `pr-<n>`, og DNS-navnet oprettes.
+4. Inden for to minutter ser agenten på Pi'en, at PR'et står på listen. Den
+   henter imaget, migrerer dev-databasen og starter
+   `maanslogen-api-pr-<n>`. Caddy genkender `api-pr-<n>.` i Host-headeren og
+   sender videre — hverken tunnel eller Caddy skal røres.
+5. En kommentar på PR'et får adresserne. Nye commits opdaterer den samme
    kommentar.
-5. Du lukker PR'et. `preview-cleanup.yml` fjerner container, image og
-   DNS-navn.
+6. Du fjerner label'en eller lukker PR'et. Workflowet fjerner DNS-navnet, og
+   agenten ser ved næste kørsel at PR'et er væk og stopper containeren.
 
 De to adresser kan regnes ud på forhånd, så web og API ikke venter på
 hinanden. Det er også derfor `NEXT_PUBLIC_API_URL` sættes ved **build** og
 ikke som en binding på Worker'en: Next inliner alt med `NEXT_PUBLIC_`-præfiks
 ind i bundlen, også i serverkoden, så en binding ville blive skygget af
 værdien der allerede står der. Det står uddybet i `apps/web/wrangler.jsonc`.
+
+Højst tre previews kører ad gangen (`MAX_PREVIEWS`). Hver tager omkring
+250 MB, og produktionen skal have plads.
 
 ---
 
@@ -292,15 +313,23 @@ Den deles af alle previews og af alle der udvikler lokalt. Det er enkelt, og
 det koster:
 
 - **En migrering i et PR rammer alle andre previews med det samme.**
-  `preview.sh` kører `migrate deploy` inden containeren starter. Prisma-
+  Agenten kører `migrate deploy` inden containeren starter. Prisma-
   migreringer går kun fremad og er som regel additive, så det går sjældent
   galt — men et PR der fjerner en kolonne, fjerner den for alle.
 - **Testdata skrider.** Halve anmeldelser, testbrugere, en migrering fra et
   PR der aldrig blev merget.
 
-Derfor er der en knap: _Actions → **Nulstil dev-databasen** → Run workflow_,
-skriv `nulstil`. Den dropper skemaet, kører alle migreringer igen og seeder
-forfra.
+Derfor findes der en nulstilling. Den ligger på Pi'en og ikke som et
+workflow, fordi et workflow ville kræve en selvhostet runner — og det er
+netop det vi ikke har. En destruktiv og sjælden handling har i øvrigt godt af
+et menneske ved tastaturet:
+
+```bash
+sudo -u maanslogen /opt/maanslogen/infra/pi/nulstil-dev-db.sh
+```
+
+Den beder om bekræftelse, dropper skemaet, kører alle migreringer igen og
+seeder forfra.
 
 > Nulstillingen kalder `prisma db seed` som et **selvstændigt** trin efter
 > `migrate reset`. Prisma 6 seedede selv til sidst; Prisma 7 gør det ikke, og
@@ -367,13 +396,31 @@ Class B.
 
 ## Når noget driller
 
-**Preview'et svarer 502.** Caddy fandt ikke containeren. På Pi'en:
+**Preview'et kommer ikke op.** Tjek i rækkefølge:
+
+1. Har PR'et label'en `preview`? Uden den sker der intet.
+2. Kørte `preview.yml` og lagde et image op? Se _Actions_, og
+   _Packages_ på repoet.
+3. Har agenten set det? På Pi'en: `journalctl -u maanslogen-agent -n 50`.
+   Den skriver `pr-42: intet image i GHCR endnu — venter`, hvis den kom først.
+4. Er der plads? `MAX_PREVIEWS` er 3. Agenten tager de laveste PR-numre.
+
+**Preview'et svarer 502.** Caddy fandt ikke containeren.
 `docker ps | grep pr-` og `docker logs maanslogen-api-pr-<n>`. Oftest gik den
-ned ved opstart på en manglende variabel i `infra/pi/.env`.
+ned ved opstart på en manglende variabel i `/etc/maanslogen/pi.env`. Husk at
+containeren kører med `--read-only`; skriver koden uden for `/tmp`, fejler den.
 
 **Preview'et svarer 404 med "ukendt vært".** Caddy kender ikke værtsnavnet.
-Enten passer `PROD_API_HOST`/`DEV_API_HOST` i `.env` ikke med DNS, eller også
-er navnet ikke på formen `api-pr-<cifre>.`.
+Enten passer `PROD_API_HOST`/`DEV_API_HOST` ikke med DNS, eller også er navnet
+ikke på formen `api-pr-<cifre>.`.
+
+**Agenten gør ingenting.** `systemctl list-timers maanslogen-agent.timer`.
+Rammer du GitHubs grænse på 60 kald i timen (uautentificeret), står det i
+loggen — sæt et skrivebeskyttet `GITHUB_TOKEN` i `/etc/maanslogen/pi.env`.
+
+**Udrulningen til produktion sker ikke.** Agenten opdager et nyt `:main`-image
+inden for to minutter. Kom der et image op? Se _Actions_ og _Packages_. Ellers
+`journalctl -u maanslogen-agent`.
 
 **Web'en viser data, men indlogning fejler.** `CORS_ORIGINS` på API'et skal
 indeholde præcis den adresse browseren kommer fra. Cookies sættes med
@@ -382,6 +429,3 @@ virker det ikke over ren HTTP.
 
 **`wrangler versions upload` siger at Worker'en ikke findes.** Den skal
 udrulles én gang i hånden først, se trin 5.
-
-**Runneren tager ikke jobbet.** Labels skal være `self-hosted` **og**
-`maanslogen-pi`. Tjek med `sudo ./svc.sh status` i runner-mappen.

@@ -1,14 +1,19 @@
 # Alt der kører på Pi'en. Bringes op med:
 #   docker compose --env-file .env up -d
 #
-# Preview-containere til de enkelte PR'er startes ikke herfra — de oprettes af
-# preview.sh og hægtes på det samme netværk.
+# Preview-containere startes ikke herfra. Agenten (infra/pi/agent/) opretter dem
+# ud fra hvilke PR'er der har label'en "preview", og hægter dem på
+# maanslogen-dev-netværket.
 
 name: maanslogen
 
 networks:
+  # To netværk, så en preview-container ikke kan nå produktions-API'et.
+  # Postgres og Caddy er med i begge; produktions-API'et kun i det første.
   maanslogen:
     name: maanslogen
+  maanslogen-dev:
+    name: maanslogen-dev
 
 volumes:
   postgres-data:
@@ -30,7 +35,7 @@ services:
     volumes:
       - postgres-data:/var/lib/postgresql/data
       - ./postgres/init-dev-db.sh:/docker-entrypoint-initdb.d/10-init-dev-db.sh:ro
-    networks: [maanslogen]
+    networks: [maanslogen, maanslogen-dev]
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER} -d maanslogen']
       interval: 10s
@@ -41,7 +46,7 @@ services:
 
   # ---- API i produktion --------------------------------------------------
   api:
-    image: maanslogen-api:latest
+    image: ${GHCR_IMAGE:-ghcr.io/mfoldager17/maanslogen-api}:main
     restart: unless-stopped
     depends_on:
       postgres:
@@ -67,7 +72,7 @@ services:
   # Kører main-grenens kode mod dev-databasen. Det er den et lokalt `pnpm
   # dev:remote` peger på. PR-previews får deres egen container ved siden af.
   api-dev:
-    image: maanslogen-api:dev
+    image: ${GHCR_IMAGE:-ghcr.io/mfoldager17/maanslogen-api}:main
     restart: unless-stopped
     depends_on:
       postgres:
@@ -88,7 +93,7 @@ services:
       R2_BUCKET: ${R2_DEV_BUCKET}
       R2_PUBLIC_BASE_URL: ${DEV_MEDIA_PUBLIC_URL}
       ENABLE_SWAGGER: 'true'
-    networks: [maanslogen]
+    networks: [maanslogen-dev]
 
   # ---- Router ------------------------------------------------------------
   # Fordeler på Host-headeren. Den findes for preview-containernes skyld:
@@ -107,7 +112,7 @@ services:
     volumes:
       - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy-data:/data
-    networks: [maanslogen]
+    networks: [maanslogen, maanslogen-dev]
 
   # ---- Tunnel ------------------------------------------------------------
   # Ingen port åbnes i routeren, og Pi'ens IP-adresse bliver aldrig offentlig.

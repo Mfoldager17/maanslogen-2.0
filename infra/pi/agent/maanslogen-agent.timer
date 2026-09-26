@@ -1,0 +1,13 @@
+[Unit]
+Description=Kør maanslogen-agent hvert andet minut
+
+[Timer]
+OnBootSec=2min
+# Hvert andet minut. Uden et GITHUB_TOKEN er GitHubs grænse 60 kald i timen
+# pr. IP-adresse, og agenten bruger ét kald pr. gang — altså 30 i timen.
+# Med et skrivebeskyttet token er grænsen 5.000, og intervallet kan sænkes.
+OnUnitActiveSec=2min
+AccuracySec=10s
+
+[Install]
+WantedBy=timers.target

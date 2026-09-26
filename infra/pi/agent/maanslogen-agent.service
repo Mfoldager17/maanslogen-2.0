@@ -1,0 +1,23 @@
+[Unit]
+Description=Bringer Pi'en i overensstemmelse med det GitHub siger bør køre
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/opt/maanslogen/infra/pi/agent/maanslogen-agent
+
+# Agenten skal bruge docker, og docker-socket er reelt root. Den kører derfor
+# som en bruger der kun er med i docker-gruppen, ikke som root.
+User=maanslogen
+Group=docker
+
+# Den læser hemmelighedsfilen og kalder docker — intet andet.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/run/docker.sock
+
+[Install]
+WantedBy=multi-user.target

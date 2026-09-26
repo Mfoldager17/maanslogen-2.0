@@ -1,11 +1,13 @@
 name: Preview
 
-# Et dev-miljø findes kun så længe der er et åbent PR. Det består af en
-# Worker-version til web og en container på Pi'en til API'et; begge mod den
-# fælles dev-database.
+# Bygger PR'ets API-image og lægger det i GHCR. Pi'en henter det selv — se
+# infra/pi/agent/. Der er ingen selvhostet runner: intet her rører Pi'en.
+#
+# Et preview opstår når label'en "preview" sættes på et PR, og forsvinder når
+# den fjernes eller PR'et lukkes.
 on:
   pull_request:
-    types: [opened, synchronize, reopened]
+    types: [labeled, unlabeled, synchronize, closed]
 
 concurrency:
   group: preview-${{ github.event.pull_request.number }}
@@ -13,51 +15,53 @@ concurrency:
 
 permissions:
   contents: read
+  packages: write
   pull-requests: write
 
-# En selvhostet runner kører workflow-kode på Pi'en derhjemme, og repoet er
-# offentligt: hvem som helst kan forke og åbne et PR. Betingelsen herunder er
-# det eneste der står mellem en fremmed og maskinen, så den står direkte på
-# hvert job frem for at gå gennem et hjælpejob.
-#
-# `head.repo.full_name == github.repository` er sandt kun når grenen ligger i
-# repoet selv, hvilket kræver push-adgang. En fork har et andet navn.
-#
-# Tidligere blev tjekket lavet i et `guard`-job, der skrev true/false til en
-# output-variabel. To ting var skidt ved det: værdien fra forespørgslen blev
-# interpoleret ind i en shell-kommando, og hele beskyttelsen afhang af at det
-# job kørte færdigt. Nu afviser GitHub selv jobbet, før der tildeles en runner.
 jobs:
-  api:
-    name: API-preview på Pi'en
-    if: github.event.pull_request.head.repo.full_name == github.repository
-    runs-on: [self-hosted, maanslogen-pi]
+  image:
+    name: Byg arm64-image til GHCR
+    # Label'en er porten. Den kan kun sættes af nogen med skriveadgang, så et
+    # tilfældigt PR udefra gør ingenting før du selv beder om det.
+    #
+    # Fork-tjekket er med som ekstra lag, men det afgørende er at en fork slet
+    # ikke *kan* lægge et image op: dens GITHUB_TOKEN er skrivebeskyttet.
+    if: >-
+      github.event.action != 'closed' &&
+      contains(github.event.pull_request.labels.*.name, 'preview') &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    # Gratis på offentlige repoer, og native arm64 — Pi'en skal ikke have et
+    # QEMU-emuleret image.
+    runs-on: ubuntu-24.04-arm
     steps:
       - uses: actions/checkout@v4
 
-      - name: Byg API-imaget
-        run: docker build -f apps/api/Dockerfile -t maanslogen-api:pr-${{ github.event.pull_request.number }} .
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Start containeren
-        run: |
-          infra/pi/preview.sh up \
-            "${{ github.event.pull_request.number }}" \
-            "https://pr-${{ github.event.pull_request.number }}-${{ vars.WORKER_NAME }}.${{ vars.WORKERS_SUBDOMAIN }}"
+      - uses: docker/setup-buildx-action@v3
 
-      - name: Læg DNS-navnet op
-        env:
-          CF_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CF_ZONE_ID: ${{ secrets.CLOUDFLARE_ZONE_ID }}
-          CF_TUNNEL_ID: ${{ secrets.CLOUDFLARE_TUNNEL_ID }}
-          NAVN: api-pr-${{ github.event.pull_request.number }}.${{ vars.DEV_DOMAIN }}
-        run: infra/scripts/dns-record.sh upsert "$NAVN"
+      - name: Byg og læg op
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/api/Dockerfile
+          push: true
+          platforms: linux/arm64
+          tags: ghcr.io/${{ github.repository_owner }}/maanslogen-api:pr-${{ github.event.pull_request.number }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
   web:
     name: Web-preview på Workers
-    if: github.event.pull_request.head.repo.full_name == github.repository
+    if: >-
+      github.event.action != 'closed' &&
+      contains(github.event.pull_request.labels.*.name, 'preview') &&
+      github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
-    outputs:
-      url: ${{ steps.upload.outputs.url }}
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -69,9 +73,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @maanslogen/contracts build
 
-      # API'ets adresse bages ind i bundlen, så den skal sættes her og ikke
-      # som en binding på Workeren. Begge adresser kan regnes ud på forhånd,
-      # så web og API ikke skal vente på hinanden.
+      # Adressen på PR'ets API kan regnes ud på forhånd, så web ikke skal vente
+      # på hverken imaget eller Pi'en. NEXT_PUBLIC_* bages ind ved build.
       - name: Byg til Workers
         working-directory: apps/web
         env:
@@ -79,11 +82,7 @@ jobs:
           NEXT_PUBLIC_MEDIA_URL: https://${{ vars.DEV_MEDIA_HOST }}
         run: pnpm cf:build
 
-      # `versions upload` lægger en ny version op med sin egen URL uden at
-      # røre den udrullede version. Der er derfor ingen Worker at rydde op i
-      # bagefter — kun DNS-navnet og containeren på Pi'en.
       - name: Læg versionen op
-        id: upload
         working-directory: apps/web
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -92,16 +91,27 @@ jobs:
           pnpm exec wrangler versions upload \
             --preview-alias "pr-${{ github.event.pull_request.number }}" \
             --message "PR #${{ github.event.pull_request.number }} — ${{ github.event.pull_request.head.sha }}"
-          echo "url=https://pr-${{ github.event.pull_request.number }}-${{ vars.WORKER_NAME }}.${{ vars.WORKERS_SUBDOMAIN }}" >> "$GITHUB_OUTPUT"
+
+  dns:
+    name: DNS for preview-API'et
+    needs: image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - env:
+          CF_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CF_ZONE_ID: ${{ secrets.CLOUDFLARE_ZONE_ID }}
+          CF_TUNNEL_ID: ${{ secrets.CLOUDFLARE_TUNNEL_ID }}
+        run: infra/scripts/dns-record.sh upsert "api-pr-${{ github.event.pull_request.number }}.${{ vars.DEV_DOMAIN }}"
 
   kommentar:
     name: Skriv adresserne på PR'et
-    needs: [api, web]
+    needs: [image, web, dns]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/github-script@v7
         env:
-          WEB_URL: ${{ needs.web.outputs.url }}
+          WEB_URL: https://pr-${{ github.event.pull_request.number }}-${{ vars.WORKER_NAME }}.${{ vars.WORKERS_SUBDOMAIN }}
           API_URL: https://api-pr-${{ github.event.pull_request.number }}.${{ vars.DEV_DOMAIN }}
         with:
           script: |
@@ -110,17 +120,19 @@ jobs:
               markør,
               '### Preview',
               '',
-              `| | |`,
-              `| --- | --- |`,
+              '| | |',
+              '| --- | --- |',
               `| Site | ${process.env.WEB_URL} |`,
               `| API | ${process.env.API_URL} |`,
-              `| API-dokumentation | ${process.env.API_URL}/docs |`,
               '',
-              'Kører mod den **fælles dev-database** med testdata — den samme som',
-              'alle andre previews og lokal udvikling. Ændringer her er synlige',
-              'for alle, og en migrering i dette PR er allerede kørt på den.',
+              'Imaget er lagt i GHCR. Pi\'en henter det selv inden for et par',
+              'minutter — den modtager ikke noget herfra.',
               '',
-              'Miljøet forsvinder når PR\'et lukkes.',
+              'Kører mod den **fælles dev-database** med testdata, som alle',
+              'previews og lokal udvikling deler. En migrering i dette PR er',
+              'allerede kørt på den.',
+              '',
+              'Fjern label\'en `preview` eller luk PR\'et, så forsvinder det igen.',
               '',
               '---',
               '_Generated by [Claude Code](https://claude.ai/code)_',
@@ -142,3 +154,38 @@ jobs:
                 issue_number: context.issue.number, body: brødtekst,
               });
             }
+
+  ryd-op:
+    name: Ryd op
+    # Når label'en fjernes eller PR'et lukkes. Containeren stopper af sig selv:
+    # agenten ser at PR'et ikke længere er på listen. Her fjernes kun DNS-navnet.
+    if: >-
+      github.event.action == 'closed' ||
+      (github.event.action == 'unlabeled' && github.event.label.name == 'preview')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fjern DNS-navnet
+        env:
+          CF_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CF_ZONE_ID: ${{ secrets.CLOUDFLARE_ZONE_ID }}
+        run: infra/scripts/dns-record.sh delete "api-pr-${{ github.event.pull_request.number }}.${{ vars.DEV_DOMAIN }}"
+
+      - name: Skriv at miljøet er væk
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const markør = '<!-- maanslogen-preview -->';
+            const { data: kommentarer } = await github.rest.issues.listComments({
+              owner: context.repo.owner, repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            const eksisterende = kommentarer.find((k) => k.body.includes(markør));
+            if (!eksisterende) return;
+            await github.rest.issues.updateComment({
+              owner: context.repo.owner, repo: context.repo.repo,
+              comment_id: eksisterende.id,
+              body: [markør, '### Preview', '', 'Miljøet er fjernet.', '',
+                     '---', '_Generated by [Claude Code](https://claude.ai/code)_'].join('\n'),
+            });

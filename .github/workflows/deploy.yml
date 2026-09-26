@@ -1,7 +1,10 @@
 name: Udrul
 
-# Produktion udrulles fra main. Dev-API'et følger med, så det delte
-# dev-miljø og lokal udvikling altid kører den kode der er merget.
+# Lægger et nyt :main-image i GHCR. Pi'en opdager det selv inden for et par
+# minutter, migrerer og genstarter — se infra/pi/agent/.
+#
+# Der er ingen selvhostet runner. Intet her har adgang til Pi'en, og Pi'en har
+# ingen skriverettigheder nogen steder.
 on:
   push:
     branches: [main]
@@ -13,65 +16,35 @@ concurrency:
 
 permissions:
   contents: read
+  packages: write
 
 jobs:
-  api:
-    name: API på Pi'en
-    runs-on: [self-hosted, maanslogen-pi]
+  image:
+    name: API-image til GHCR
+    runs-on: ubuntu-24.04-arm
     steps:
       - uses: actions/checkout@v4
 
-      - name: Byg imaget
-        run: |
-          docker build -f apps/api/Dockerfile -t maanslogen-api:${{ github.sha }} .
-          docker tag maanslogen-api:${{ github.sha }} maanslogen-api:latest
-          docker tag maanslogen-api:${{ github.sha }} maanslogen-api:dev
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-      # Migreringer køres som et selvstændigt trin før den nye version
-      # starter. Fra entrypointet ville flere instanser kapløbe om at migrere.
-      - name: Migrér produktionsdatabasen
-        working-directory: infra/pi
-        run: |
-          . ./load-env.sh
-          docker run --rm --network maanslogen \
-            -e DATABASE_URL="postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/maanslogen?schema=public" \
-            maanslogen-api:${{ github.sha }} ./node_modules/.bin/prisma migrate deploy
+      - uses: docker/setup-buildx-action@v3
 
-      - name: Migrér dev-databasen
-        working-directory: infra/pi
-        run: |
-          . ./load-env.sh
-          docker run --rm --network maanslogen \
-            -e DATABASE_URL="postgresql://maanslogen_dev:${DEV_POSTGRES_PASSWORD}@postgres:5432/maanslogen_dev?schema=public" \
-            maanslogen-api:${{ github.sha }} ./node_modules/.bin/prisma migrate deploy
-
-      - name: Genstart API'erne
-        working-directory: infra/pi
-        run: docker compose --env-file "$MAANSLOGEN_ENV_FILE" up -d --force-recreate api api-dev
-
-      - name: Tjek at de svarer
-        working-directory: infra/pi
-        run: |
-          . ./load-env.sh
-          for tjeneste in api api-dev; do
-            klar=nej
-            for _ in $(seq 1 30); do
-              if docker compose --env-file "$MAANSLOGEN_ENV_FILE" exec -T "$tjeneste" node -e \
-                  "fetch('http://127.0.0.1:4000/api/v1/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))" 2>/dev/null; then
-                klar=ja; break
-              fi
-              sleep 2
-            done
-            # Uden dette faldt løkken bare igennem, og trinnet blev grønt selv
-            # når tjenesten aldrig kom op. En udrulning der ikke virker skal
-            # sige fra, ikke melde succes.
-            if [ "$klar" = nej ]; then
-              echo "$tjeneste blev aldrig klar" >&2
-              docker compose --env-file "$MAANSLOGEN_ENV_FILE" logs --tail 50 "$tjeneste" >&2
-              exit 1
-            fi
-            echo "$tjeneste er klar"
-          done
+      - name: Byg og læg op
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/api/Dockerfile
+          push: true
+          platforms: linux/arm64
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/maanslogen-api:main
+            ghcr.io/${{ github.repository_owner }}/maanslogen-api:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
   web:
     name: Web på Workers

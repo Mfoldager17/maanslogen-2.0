@@ -13,7 +13,7 @@ tilstanden hver gang et PR åbnes.
 | ------------------------ | -------------------------------- |
 | Worker'en (web)          | `wrangler` i `.github/workflows` |
 | DNS for `api-pr-<n>`     | `infra/scripts/dns-record.sh`    |
-| Preview-containere       | `infra/pi/preview.sh`            |
+| Preview-containere       | `infra/pi/agent/` på Pi'en       |
 | Tunnelens ingress-regler | Cloudflare-dashboardet           |
 
 Ingress-reglerne er undtaget af to grunde: der er kun én regel — alt videre

@@ -1,0 +1,170 @@
+#!/usr/bin/env bash
+#
+# Bringer det der kører på Pi'en i overensstemmelse med det GitHub siger der
+# bør køre. Kaldes af maanslogen-agent.timer hvert andet minut.
+#
+# Retningen er det vigtige. Der er ingen selvhostet GitHub-runner: GitHub
+# sender aldrig kode til denne maskine. Agenten spørger, og udfører kun et
+# fast sæt handlinger — docker pull og docker run med argumenter den selv
+# bestemmer. Den kode du læser her kommer fra main og kan ikke ændres af et PR.
+#
+# Tre uafhængige ting skal være opfyldt, før et PR får en container:
+#
+#   1. Der findes et image i GHCR. Et PR fra en fork får et skrivebeskyttet
+#      GITHUB_TOKEN og kan derfor slet ikke lægge et image op. Uden image er
+#      der intet at køre.
+#   2. PR'et har label'en "preview". Labels kan kun sættes af nogen med
+#      skriveadgang til repoet.
+#   3. Grenen ligger i repoet selv, ikke i en fork. Tjekkes igen her.
+
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+# shellcheck source=infra/pi/load-env.sh
+. ./load-env.sh
+
+: "${GITHUB_REPO:=Mfoldager17/maanslogen-2.0}"
+: "${GHCR_IMAGE:=ghcr.io/mfoldager17/maanslogen-api}"
+: "${PREVIEW_LABEL:=preview}"
+# Hver preview tager omkring 250 MB. Loftet findes for at et par ivrige PR'er
+# ikke kan æde hukommelsen under produktionen.
+: "${MAX_PREVIEWS:=3}"
+
+log() { printf '%s %s\n' "$(date -Is)" "$*"; }
+
+# GITHUB_TOKEN er valgfri. Repoet er offentligt, så det virker uden — men
+# uautentificeret er grænsen 60 kald i timen pr. IP, og med et
+# skrivebeskyttet token er den 5.000. Agenten har aldrig brug for skriveadgang.
+gh_api() {
+  local sti=$1
+  if [ -n "${GITHUB_TOKEN:-}" ]; then
+    curl -sS --fail-with-body --max-time 20 \
+      -H "Authorization: Bearer $GITHUB_TOKEN" \
+      -H 'Accept: application/vnd.github+json' \
+      "https://api.github.com${sti}"
+  else
+    curl -sS --fail-with-body --max-time 20 \
+      -H 'Accept: application/vnd.github+json' \
+      "https://api.github.com${sti}"
+  fi
+}
+
+# ---- Hvilke PR'er skal have en preview? ---------------------------------
+oenskede_previews() {
+  gh_api "/repos/${GITHUB_REPO}/pulls?state=open&per_page=100" \
+    | jq -r --arg label "$PREVIEW_LABEL" --arg repo "$GITHUB_REPO" '
+        .[]
+        | select(.head.repo.full_name == $repo)
+        | select([.labels[].name] | index($label))
+        | .number
+      ' | sort -n | head -n "$MAX_PREVIEWS"
+}
+
+koerende_previews() {
+  docker ps --filter 'label=maanslogen.preview' \
+    --format '{{.Label "maanslogen.preview"}}' | sort -n
+}
+
+start_preview() {
+  local pr=$1
+  local image="${GHCR_IMAGE}:pr-${pr}"
+  local navn="maanslogen-api-pr-${pr}"
+
+  if ! docker pull -q "$image" >/dev/null 2>&1; then
+    log "pr-${pr}: intet image i GHCR endnu — venter"
+    return 0
+  fi
+
+  log "pr-${pr}: starter"
+  docker rm -f "$navn" >/dev/null 2>&1 || true
+
+  local db="postgresql://maanslogen_dev:${DEV_POSTGRES_PASSWORD}@postgres:5432/maanslogen_dev?schema=public"
+
+  # Migrér dev-databasen med PR'ets eget skema. Den deles af alle previews;
+  # se docs/environments.md om hvad det betyder.
+  docker run --rm --network maanslogen-dev \
+    -e DATABASE_URL="$db" "$image" \
+    ./node_modules/.bin/prisma migrate deploy >/dev/null
+
+  # Containeren kører PR-kode. Den er derfor spærret så stramt som den kan
+  # være og stadig virke: intet skrivbart rodfilsystem, ingen capabilities,
+  # ingen rettighedsforfremmelse, loft på hukommelse og processer — og kun på
+  # dev-netværket, hvor produktions-API'et ikke er.
+  docker run -d --name "$navn" \
+    --label "maanslogen.preview=${pr}" \
+    --network maanslogen-dev \
+    --restart unless-stopped \
+    --read-only --tmpfs /tmp:rw,noexec,nosuid,size=64m \
+    --cap-drop ALL \
+    --security-opt no-new-privileges \
+    --memory 384m --pids-limit 256 \
+    -e NODE_ENV=production -e PORT=4000 \
+    -e DATABASE_URL="$db" \
+    -e JWT_ACCESS_SECRET="${DEV_JWT_ACCESS_SECRET}" \
+    -e JWT_REFRESH_SECRET="${DEV_JWT_REFRESH_SECRET}" \
+    -e CORS_ORIGINS="https://pr-${pr}-${WORKER_NAME}.${WORKERS_SUBDOMAIN}" \
+    -e STORAGE_DRIVER=r2 \
+    -e R2_ACCOUNT_ID="${R2_ACCOUNT_ID}" \
+    -e R2_ACCESS_KEY_ID="${R2_ACCESS_KEY_ID}" \
+    -e R2_SECRET_ACCESS_KEY="${R2_SECRET_ACCESS_KEY}" \
+    -e R2_BUCKET="${R2_DEV_BUCKET}" \
+    -e R2_PUBLIC_BASE_URL="${DEV_MEDIA_PUBLIC_URL}" \
+    -e ENABLE_SWAGGER=true \
+    "$image" >/dev/null
+
+  log "pr-${pr}: kører"
+}
+
+stop_preview() {
+  local pr=$1
+  log "pr-${pr}: fjerner"
+  docker rm -f "maanslogen-api-pr-${pr}" >/dev/null 2>&1 || true
+  docker image rm -f "${GHCR_IMAGE}:pr-${pr}" >/dev/null 2>&1 || true
+}
+
+# ---- Produktion og det delte dev-API ------------------------------------
+# Følger :main. Er der lagt et nyt image op, migreres og genstartes der.
+opdater_tjeneste() {
+  local tjeneste=$1 netvaerk=$2 database=$3 bruger=$4 kode=$5
+  local image="${GHCR_IMAGE}:main"
+
+  local koerende ny
+  koerende=$(docker inspect --format '{{.Image}}' "maanslogen-${tjeneste}" 2>/dev/null || echo ingen)
+  docker pull -q "$image" >/dev/null
+  ny=$(docker inspect --format '{{.Id}}' "$image")
+
+  [ "$koerende" = "$ny" ] && return 0
+
+  log "${tjeneste}: nyt image, migrerer og genstarter"
+  docker run --rm --network "$netvaerk" \
+    -e DATABASE_URL="postgresql://${bruger}:${kode}@postgres:5432/${database}?schema=public" \
+    "$image" ./node_modules/.bin/prisma migrate deploy >/dev/null
+
+  docker compose --env-file "$MAANSLOGEN_ENV_FILE" up -d --force-recreate "$tjeneste"
+  log "${tjeneste}: opdateret"
+}
+
+# ---- Kør ----------------------------------------------------------------
+main() {
+  mapfile -t oenskede < <(oenskede_previews)
+  mapfile -t koerende < <(koerende_previews)
+
+  for pr in "${oenskede[@]}"; do
+    [ -n "$pr" ] || continue
+    printf '%s\n' "${koerende[@]}" | grep -qx "$pr" || start_preview "$pr"
+  done
+
+  for pr in "${koerende[@]}"; do
+    [ -n "$pr" ] || continue
+    printf '%s\n' "${oenskede[@]}" | grep -qx "$pr" || stop_preview "$pr"
+  done
+
+  opdater_tjeneste api     maanslogen     maanslogen     "$POSTGRES_USER" "$POSTGRES_PASSWORD"
+  opdater_tjeneste api-dev maanslogen-dev maanslogen_dev maanslogen_dev   "$DEV_POSTGRES_PASSWORD"
+}
+
+# Kun når scriptet køres direkte. Så kan en test source det og kalde de
+# enkelte funktioner med stubbet docker og GitHub.
+if [ "${BASH_SOURCE[0]}" = "$0" ]; then
+  main "$@"
+fi
