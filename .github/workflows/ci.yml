@@ -54,6 +54,13 @@ jobs:
           DATABASE_URL: ${{ env.TEST_DATABASE_URL }}
         run: pnpm exec prisma migrate deploy
 
+      # Guiden er skredet fra koden tre gange — selvhostet runner efter den var
+      # væk, docker build på Pi'en efter imaget kom fra GHCR, dev migreret på
+      # produktionens netværk. Hver gang ville den have stoppet en
+      # installation, og ingen test fangede det, fordi det er prosa.
+      - name: Dokumentationen stemmer med koden
+        run: python3 infra/scripts/tjek-dokumentation.py
+
       - name: Typecheck
         run: pnpm turbo run typecheck
 

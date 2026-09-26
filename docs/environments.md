@@ -14,7 +14,7 @@ ubuntu-24.04-arm                Workers (web)          Postgres
   · :main                         Tunnel ─► Caddy ─►     api-dev    (main)
   · :pr-42                                               api-pr-42  (preview)
        │                                                      ▲
-       │   Pi'en spørger hvert femte minut:                   │
+       │   GitHub ringer på, og agenten spørger:              │
        │     · hvilke åbne PR'er har label "preview"?          │
        │     · er der et nyt :main-image?                      │
        └───────────────────────────────────────────►  maanslogen-agent
@@ -231,6 +231,12 @@ Pull'et ligger i et selvstændigt trin og ikke inde i agenten, fordi bash læser
 et script løbende under kørslen: et script der skriver sig selv om undervejs kan
 ende med at udføre noget sludder.
 
+Timeren her kører hver halve time, og det er **ikke** sådan udrulninger
+normalt lander. Det klarer webhooken i næste trin på et par sekunder. Timeren
+er sikkerhedsnettet: webhooks bliver væk — Pi'en genstarter, netværket
+blinker, GitHub giver op efter ti sekunder — og uden den ville en tabt besked
+betyde at en udrulning aldrig kom frem, uden at nogen opdagede det.
+
 Følg med:
 
 ```bash
@@ -368,8 +374,9 @@ curl -s https://maanslogen.dk -o /dev/null -w '%{http_code}\n'
    arm64, og gratis på et offentligt repo — og lægger det i GHCR som
    `:pr-<n>`. Samtidig bygges web'en og lægges op som en Worker-version med
    aliaset `pr-<n>`, og DNS-navnet oprettes.
-4. Inden for fem minutter ser agenten på Pi'en, at PR'et står på listen. Den
-   henter imaget, migrerer dev-databasen og starter
+4. Når workflowet er færdigt, sender GitHub en webhook til Pi'en. Agenten
+   vækkes med det samme, ser at PR'et står på listen, henter imaget, migrerer
+   dev-databasen og starter
    `maanslogen-api-pr-<n>`. Caddy genkender `api-pr-<n>.` i Host-headeren og
    sender videre — hverken tunnel eller Caddy skal røres.
 5. En kommentar på PR'et får adresserne. Nye commits opdaterer den samme
@@ -480,22 +487,26 @@ skema.
 
 **GitHub Actions.** Repoet er offentligt, og på offentlige repoer er
 GitHub-hostede runnere gratis uden loft. Målt på en rigtig kørsel: 239
-sekunders væg-tid, `billable.UBUNTU.total_ms = 0`. Den selvhostede runner på
-Pi'en tæller aldrig med — hverken på et offentligt eller et privat repo.
+sekunders væg-tid, `billable.UBUNTU.total_ms = 0`.
+
+Alt bygges på GitHub. Pi'en kører ingen jobs — den henter færdige images og
+forbruger derfor ingen minutter, uanset repoets synlighed.
 
 Gøres repoet privat, tæller de GitHub-hostede jobs med i den månedlige pulje
-(2.000 minutter på GitHub Free, 3.000 på Pro). Forbruget målt på samme kørsel:
+(2.000 minutter på GitHub Free, 3.000 på Pro):
 
-| Job                        | Hvor   | Tid    |
-| -------------------------- | ------ | ------ |
-| CI · typecheck, lint, test | GitHub | ~2 min |
-| CI · Docker-images         | GitHub | ~4 min |
-| Preview · web              | GitHub | ~4 min |
-| Preview · API              | Pi'en  | gratis |
-| Oprydning og nulstilling   | Pi'en  | gratis |
+| Job                        | Hvor               | Tid    |
+| -------------------------- | ------------------ | ------ |
+| CI · typecheck, lint, test | `ubuntu-latest`    | ~2 min |
+| CI · Docker-images         | `ubuntu-latest`    | ~4 min |
+| Udrul/Preview · API-image  | `ubuntu-24.04-arm` | ~4 min |
+| Udrul/Preview · web        | `ubuntu-latest`    | ~4 min |
+| DNS og kommentar           | `ubuntu-latest`    | <1 min |
+| Agent og nulstilling af db | Pi'en, ingen CI    | gratis |
 
-Cirka 10 minutter pr. push til et PR, altså omkring 200 pushes om måneden
-inden for de 2.000.
+Cirka 15 minutter pr. push til et PR med preview, altså omkring 130 pushes om
+måneden inden for de 2.000. Bemærk at `ubuntu-24.04-arm` kun er gratis på
+offentlige repoer — på et privat repo tæller den med som alle andre.
 
 Det eneste der reelt kan vælte tallene, er R2's Class B-operationer, og dem
 holder cache-reglen nede. Regnestykket står i
@@ -532,9 +543,19 @@ ikke på formen `api-pr-<cifre>.`.
 Rammer du GitHubs grænse på 60 kald i timen (uautentificeret), står det i
 loggen — sæt et skrivebeskyttet `GITHUB_TOKEN` i `/etc/maanslogen/pi.env`.
 
-**Udrulningen til produktion sker ikke.** Agenten opdager et nyt `:main`-image
-inden for fem minutter. Kom der et image op? Se _Actions_ og _Packages_. Ellers
-`journalctl -u maanslogen-agent`.
+**Udrulningen til produktion sker ikke.** Normalt går der sekunder: GitHub
+sender en webhook, når workflowet er færdigt. Sker der intet, så tjek i
+rækkefølge:
+
+1. Kom der et image op? Se _Actions_ og _Packages_.
+2. Nåede webhooken frem? _Settings → Webhooks → Recent Deliveries_ viser hvert
+   forsøg og svaret. 401 betyder at `WEBHOOK_SECRET` ikke er den samme de to
+   steder.
+3. `journalctl -u maanslogen-webhook -n 30` og
+   `journalctl -u maanslogen-agent -n 30`.
+
+Timeren fanger det alligevel inden for en halv time — den findes netop til de
+beskeder der bliver væk.
 
 **Web'en viser data, men indlogning fejler.** `CORS_ORIGINS` på API'et skal
 indeholde præcis den adresse browseren kommer fra. Cookies sættes med
