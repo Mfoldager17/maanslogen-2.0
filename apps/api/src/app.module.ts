@@ -19,6 +19,17 @@ import { QuestionModule } from './modules/questions/question.module';
 import { ReviewModule } from './modules/reviews/review.module';
 import { UserModule } from './modules/users/user.module';
 
+/** `pino-pretty` hvis den er installeret, ellers almindelig JSON-logning. */
+function prettyTransport(nodeEnv: AppConfig['NODE_ENV']) {
+  if (nodeEnv === 'production') return undefined;
+  try {
+    require.resolve('pino-pretty');
+    return { target: 'pino-pretty', options: { singleLine: true } };
+  } catch {
+    return undefined;
+  }
+}
+
 @Module({
   imports: [
     ConfigModule,
@@ -34,10 +45,11 @@ import { UserModule } from './modules/users/user.module';
             return id;
           },
           // Struktureret JSON i produktion; læsbart i udvikling.
-          transport:
-            config.NODE_ENV === 'development'
-              ? { target: 'pino-pretty', options: { singleLine: true } }
-              : undefined,
+          // pino-pretty er en devDependency og findes ikke i produktionsimaget,
+          // så vi slår den kun til når den faktisk kan indlæses. Ellers ville
+          // et image startet uden NODE_ENV=production gå ned på en manglende
+          // transport i stedet for bare at logge JSON.
+          transport: prettyTransport(config.NODE_ENV),
           redact: {
             paths: [
               'req.headers.authorization',

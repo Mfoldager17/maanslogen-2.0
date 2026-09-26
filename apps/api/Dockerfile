@@ -21,8 +21,16 @@ RUN --mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store \
 FROM deps AS build
 COPY . .
 RUN pnpm --filter @maanslogen/contracts build && pnpm --filter @maanslogen/api build
+
 # Fjern udviklingsafhængigheder fra det der skal med videre.
-RUN pnpm --filter @maanslogen/api --prod deploy /out
+# `--legacy` er påkrævet fra pnpm 10: uden det afviser `deploy` et workspace
+# der ikke har `inject-workspace-packages=true`.
+RUN pnpm --filter @maanslogen/api --prod deploy --legacy /out
+
+# Generér Prisma-klienten ind i den udrullede kopi. Postinstall ovenfor skrev
+# den ind i repoets node_modules, og `deploy` laver et helt nyt træ — uden
+# dette trin bygger imaget fint og går ned ved opstart.
+RUN cd /out && pnpm exec prisma generate
 
 # ---- Kørsel --------------------------------------------------------------
 FROM node:22-alpine AS runtime
