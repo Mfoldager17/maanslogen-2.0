@@ -1,14 +1,14 @@
 import Link from "next/link";
 import type { BeverageSummary } from "@maanslogen/contracts";
 import { MediaImage } from "./media-image";
-import { Meter } from "@/components/ui/meter";
-import { formatCount, formatRating } from "@/lib/format";
+import { StarRating } from "@/components/ui/star-rating";
 
 /**
- * Kortet er en aflæsning, ikke en reklame. Mærke og type står som en nøgle i
- * spærrede versaler, navnet i monospace, og bedømmelsen som et instrument med
- * faste segmenter frem for stjerner — stjernerne hører til på selve
- * drikkevaresiden, hvor der er plads til dem.
+ * Kortet er det sted man bladrer, ikke det sted man aflæser. Instrumenterne —
+ * målerne, de spærrede versal-etiketter, statusprikken — bliver derfor på
+ * drikkevaresiden og i bedømmelsesfordelingen, hvor der faktisk studeres tal.
+ * Her står kun det man vælger ud fra: billede, mærke, navn, et par egenskaber
+ * og stjerner.
  *
  * Hver blok har låst højde, så alle kort i gitteret er ens uanset indhold.
  * Målt spænd: 0px på alle bredder.
@@ -38,20 +38,14 @@ export function BeverageCard({
             sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
             priority={priority}
           />
-
-          {/* Aflæsningen står på billedet, hvor øjet lander først. */}
-          <span className="absolute right-2 top-2 inline-flex items-center gap-1 rounded-[3px] border border-line-strong bg-canvas/85 px-1.5 py-0.5 font-mono text-[0.6875rem] font-medium text-ink backdrop-blur-sm">
-            <span
-              className={`h-1 w-1 rounded-full ${anmeldt ? "bg-accent" : "bg-ink-muted"}`}
-              aria-hidden="true"
-            />
-            {anmeldt ? formatRating(beverage.rating.average) : "—"}
-          </span>
         </div>
 
         <div className="flex flex-1 flex-col gap-2 px-3.5 pb-3.5 pt-3">
-          <p className="label-mono truncate" title={`${beverage.brandName} · ${beverage.typeName}`}>
-            {beverage.brandName} · {beverage.typeName}
+          <p
+            className="truncate text-xs leading-4 text-ink-muted"
+            title={`${beverage.brandName} · ${beverage.typeName}`}
+          >
+            {beverage.brandName} <span className="text-line-strong">·</span> {beverage.typeName}
           </p>
 
           {/*
@@ -77,7 +71,7 @@ export function BeverageCard({
             {beverage.highlights.slice(0, 3).map((attribute) => (
               <span
                 key={attribute.definitionId}
-                className="inline-flex shrink-0 items-center whitespace-nowrap rounded-[3px] border border-line bg-sunken px-1.5 font-mono text-[0.6875rem] leading-5 text-ink-soft"
+                className="inline-flex shrink-0 items-center whitespace-nowrap rounded-full border border-line bg-sunken px-2 text-[0.6875rem] leading-5 text-ink-soft"
                 title={`${attribute.displayName}: ${attribute.displayValue}`}
               >
                 {attribute.dataType === "BOOLEAN" ? attribute.displayName : attribute.displayValue}
@@ -85,20 +79,16 @@ export function BeverageCard({
             ))}
           </div>
 
-          <div className="mt-auto flex flex-col gap-1.5 pt-1.5">
-            <Meter value={anmeldt ? beverage.rating.average : 0} max={5} animate={anmeldt} />
-            <p className="font-mono text-[0.6875rem] leading-4 text-ink-muted">
-              {anmeldt ? (
-                <>
-                  <span className="tabular text-ink-soft">
-                    {formatCount(beverage.rating.count)}
-                  </span>{" "}
-                  {beverage.rating.count === 1 ? "anmeldelse" : "anmeldelser"}
-                </>
-              ) : (
-                "Ingen anmeldelser"
-              )}
-            </p>
+          {/*
+           * Uden anmeldelser vises ingen stjerner. Fem tomme ville læses som
+           * "bedømt til nul" frem for "ikke bedømt endnu".
+           */}
+          <div className="mt-auto flex h-5 items-center pt-1.5">
+            {anmeldt ? (
+              <StarRating value={beverage.rating.average} count={beverage.rating.count} size="sm" />
+            ) : (
+              <span className="text-xs text-ink-muted">Ingen anmeldelser endnu</span>
+            )}
           </div>
         </div>
       </Link>

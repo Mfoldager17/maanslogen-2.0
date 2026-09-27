@@ -65,7 +65,12 @@ export function StarRating({
       </span>
 
       {showValue ? (
-        <span className="tabular shrink-0 text-sm font-semibold" aria-hidden="true">
+        // Tallet følger stjernernes størrelse. I `sm` — på drikkevarekortene —
+        // konkurrerede `text-sm font-semibold` med selve navnet.
+        <span
+          className={cn("tabular shrink-0 font-semibold", size === "sm" ? "text-xs" : "text-sm")}
+          aria-hidden="true"
+        >
           {formatRating(value)}
         </span>
       ) : null}
