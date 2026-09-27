@@ -21,7 +21,7 @@ vundet.
                                │                 │
                       ┌────────▼──────┐   ┌──────▼────────────┐
                       │ PostgreSQL 17 │   │ Cloudflare R2     │
-                      │               │   │ (LocalStack lokalt)│
+                      │               │   │ (Alarik lokalt)   │
                       └───────────────┘   └───────────────────┘
 
                     packages/contracts (Zod) bruges af begge
@@ -222,8 +222,14 @@ Klienten kan hverken vælge bucket eller sti, så en manipuleret forespørgsel k
 ikke overskrive et andet objekt.
 
 Produktionen kører på **Cloudflare R2**: ingen egress-omkostninger, indbygget CDN
-og S3-kompatibel API. Lokalt kører LocalStack på samme API, så koden er identisk —
+og S3-kompatibel API. Lokalt kører Alarik på samme API, så koden er identisk —
 kun `STORAGE_DRIVER` og nøglerne skifter.
+
+Lokalt har objektlageret skiftet to gange, begge gange af distributionsgrunde og
+ikke tekniske: MinIO forsvandt fra Docker Hub i september 2026, og LocalStack
+begyndte i marts 2026 at kræve et login-token for overhovedet at starte — også
+gratisudgaven. Alarik er Apache 2.0 uden licensserver og kan ikke gøre det samme.
+Se kommentarerne i `docker/docker-compose.yml`.
 
 ### Uploadforløbet
 

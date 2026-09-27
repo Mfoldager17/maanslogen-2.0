@@ -3,18 +3,20 @@
 # S3-serveren taler samme API som Cloudflare R2, så API'et kører med præcis den
 # samme kode lokalt og i produktion — kun STORAGE_DRIVER og nøglerne skifter.
 #
-# Her stod MinIO indtil september 2026, hvor MinIO slettede minio/minio og
-# minio/mc fra Docker Hub. quay.io holdt heller ikke: de tags der findes
-# omtalt, svarer 401 på manifestet.
+# Her har stået to ting før, og begge døde af distributionspolitik frem for af
+# tekniske grunde: MinIO, indtil minio/minio blev slettet fra Docker Hub i
+# september 2026, og LocalStack, som siden marts 2026 kræver et login-token for
+# overhovedet at starte — også til gratisudgaven. Den afviser med exit-kode 55
+# og "License activation failed" før den lytter på en eneste port.
 #
-# Valget faldt på LocalStack frem for adobe/s3mock, som ellers er en femtedel
-# så stor. Grunden er presignede URL'er. s3mock skriver selv at den tager imod
-# dem uden at validere signatur, udløb eller HTTP-verbum — og hele vores
-# upload-sti hviler på netop dem. En fejl i vores presign ville altså virke
-# lokalt og først vise sig mod R2. Det er den slags fejl der er dyrest.
+# Alarik er valgt fordi den ikke kan gøre det samme ved os: Apache 2.0, ingen
+# licensserver, ingen konto. Den validerer presignede URL'er rigtigt (SigV4,
+# udløb, verbum), og det er hele grunden til at adobe/s3mock blev fravalgt
+# tidligere — den tager imod dem uden at kontrollere signaturen, så en fejl i
+# vores presign ville virke lokalt og først vise sig mod R2.
 #
-# LocalStack lytter på 4566 indeni, men udstilles på 9000 udadtil, så
-# .env-filer, tests og next.config kan blive som de er.
+# Alarik lytter på 8080 indeni, men udstilles på 9000 udadtil, så .env-filer,
+# tests og next.config kan blive som de er.
 
 name: maanslogen
 
@@ -36,30 +38,83 @@ services:
       timeout: 5s
       retries: 10
 
-  # Bemærk: gratisudgaven gemmer ikke data på tværs af `infra:down`. Det er
-  # til at leve med her — seeden opretter ingen billeder, så det eneste der
-  # går tabt, er hvad du selv har uploadet mens du testede.
-  s3:
-    image: localstack/localstack:2026.08.4
+  # Selve objektlageret. Ingen port udstillet: al trafik går gennem `s3`
+  # nedenfor, som ejer CORS.
+  alarik:
+    image: ghcr.io/achtungsoftware/alarik:1.0.0-beta-16
     restart: unless-stopped
     environment:
-      SERVICES: s3
-      DEBUG: "0"
-      # Nøglerne er vilkårlige, men skal matche apps/api/.env.
-      AWS_ACCESS_KEY_ID: minioadmin
-      AWS_SECRET_ACCESS_KEY: minioadmin
-      AWS_DEFAULT_REGION: us-east-1
-    ports:
-      - "9000:4566"
+      # Skal matche S3_REGION i apps/api/.env. Alarik afviser en signatur hvis
+      # regionen i credential-scopen ikke er præcis denne — som rigtig S3 gør.
+      # Vi kører "auto", fordi det er den R2 kræver, og så er det samme værdi
+      # begge steder.
+      ALARIK_REGION: auto
+      API_BASE_URL: http://localhost:9000
+      CONSOLE_BASE_URL: http://localhost:3000
+      ADMIN_USERNAME: maanslogen
+      ADMIN_PASSWORD: maanslogen-lokal
+      ALLOW_ACCOUNT_CREATION: "false"
+      # Alarik nægter at starte i produktionstilstand uden. Den er ikke en
+      # hemmelighed: den signerer kun sessioner mod denne container, som kun
+      # lytter internt i compose-netværket.
+      JWT: lokal-udvikling-ikke-en-hemmelighed
+      # Nøglerne seedes af Alarik selv ved første boot, så der ikke skal klikkes
+      # i en webkonsol for at få et login der matcher apps/api/.env. Navnet
+      # "minioadmin" er historisk — det er beholdt så eksisterende .env-filer
+      # bliver ved med at virke.
+      DEFAULT_ACCESS_KEY: minioadmin
+      DEFAULT_SECRET_KEY: minioadmin
+      DEFAULT_BUCKETS: maanslogen-dev,maanslogen-test
     volumes:
-      # Scriptet køres når LocalStack melder sig klar, og opretter de to
-      # buckets. Derfor er der ingen init-container mere.
-      - ./localstack-buckets.sh:/etc/localstack/init/ready.d/buckets.sh:ro
+      - alarik-data:/app/Storage
+
+  # CORS-skal foran Alarik.
+  #
+  # Alarik har ét globalt CORS-filter, ikke PutBucketCors per bucket, og dets
+  # tilladte headere er en fast liste i kildekoden: accept, authorization,
+  # content-type, origin, x-requested-with, amz-sdk-invocation-id. `cache-control`
+  # står ikke på den — og det er netop den header vores presignede PUT sender,
+  # fordi den afgør om Cloudflare må cache billedet i stedet for at spørge R2
+  # hver gang. Uden denne skal ville browserens preflight blive afvist.
+  #
+  # Alternativet var at droppe `Cache-Control` lokalt, men så ville uploadstien
+  # lokalt og mod R2 ikke længere være den samme — præcis den fælde vi undgik
+  # ved at fravælge s3mock.
+  s3:
+    image: nginx:1.29-alpine
+    restart: unless-stopped
+    depends_on:
+      - alarik
+    ports:
+      - "9000:80"
+    volumes:
+      - ./alarik-cors.conf:/etc/nginx/conf.d/default.conf:ro
     healthcheck:
-      test: ["CMD-SHELL", "awslocal s3 ls >/dev/null 2>&1"]
+      # Rammer Alariks readyz gennem proxyen, så den grønne status betyder at
+      # hele vejen virker — ikke bare at nginx er oppe.
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/readyz >/dev/null 2>&1"]
       interval: 5s
       timeout: 5s
       retries: 20
 
+  # Engangsjob: sætter offentlig læsning på de to buckets, så browseren kan
+  # hente billeder direkte fra NEXT_PUBLIC_MEDIA_URL uden nøgler. Alt andet
+  # (admin, nøgler, buckets) seeder Alarik selv via env ovenfor.
+  s3-bootstrap:
+    image: curlimages/curl:8.22.0
+    restart: "no"
+    depends_on:
+      - alarik
+    environment:
+      ALARIK_URL: http://alarik:8080
+      S3_REGION: auto
+      S3_ACCESS_KEY_ID: minioadmin
+      S3_SECRET_ACCESS_KEY: minioadmin
+      BUCKETS: maanslogen-dev maanslogen-test
+    entrypoint: ["sh", "/bootstrap.sh"]
+    volumes:
+      - ./alarik-bootstrap.sh:/bootstrap.sh:ro
+
 volumes:
   postgres-data:
+  alarik-data:
