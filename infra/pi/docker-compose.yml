@@ -2,13 +2,13 @@
 #   docker compose --env-file .env up -d
 #
 # Preview-containere startes ikke herfra. Agenten (infra/pi/agent/) opretter dem
-# ud fra hvilke PR'er der har label'en "preview", og hægter dem på
+# ud fra om et åbent PR har label'en "dev", og hægter dev-API'et på
 # maanslogen-dev-netværket.
 
 name: maanslogen
 
 networks:
-  # To netværk, så en preview-container ikke kan nå produktions-API'et.
+  # To netværk, så dev-API'et ikke kan nå produktionens database.
   # Postgres og Caddy er med i begge; produktions-API'et kun i det første.
   maanslogen:
     name: maanslogen
@@ -70,9 +70,11 @@ services:
 
   # ---- Delt dev-API ------------------------------------------------------
   # Kører main-grenens kode mod dev-databasen. Det er den et lokalt `pnpm
-  # dev:remote` peger på. PR-previews får deres egen container ved siden af.
+  # dev:remote` peger på. Det er det eneste dev-API — se docs/environments.md.
   api-dev:
-    image: ${GHCR_IMAGE:-ghcr.io/mfoldager17/maanslogen-api}:main
+    # Taggen sættes af agenten: `dev` når et PR har label'en `dev`, ellers
+    # `main`. Skal-værdien her gælder når compose kaldes i hånden.
+    image: ${GHCR_IMAGE:-ghcr.io/mfoldager17/maanslogen-api}:${API_DEV_TAG:-main}
     restart: unless-stopped
     depends_on:
       postgres:
@@ -96,16 +98,16 @@ services:
     networks: [maanslogen-dev]
 
   # ---- Router ------------------------------------------------------------
-  # Fordeler på Host-headeren. Den findes for preview-containernes skyld:
-  # uden den skulle tunnelens konfiguration skrives om og genstartes for hver
-  # PR. Med den rører hverken tunnel eller DNS-opsætning et PR.
+  # Fordeler på Host-headeren, så produktion og dev kan dele én tunnel.
+  # Tunnelen giver al trafik til Caddy og skal derfor hverken skrives om
+  # eller genstartes, når dev-miljøet skifter hvilket PR det viser.
   caddy:
     image: caddy:2-alpine
     restart: unless-stopped
     # Caddyfile'en slår værtsnavnene op med {$...}, og Caddy læser dem fra sit
     # eget miljø — ikke fra .env-filen compose bruger. Uden de to linjer bliver
     # host-matcherne tomme, og Caddy nægter at starte med "module value cannot
-    # be null". Det ville tage hele routeren ned, ikke kun previews.
+    # be null". Det ville tage hele routeren ned — også produktionen.
     environment:
       PROD_API_HOST: ${PROD_API_HOST}
       DEV_API_HOST: ${DEV_API_HOST}

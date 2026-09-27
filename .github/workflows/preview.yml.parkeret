@@ -1,3 +1,22 @@
+# PARKERET — kører ikke.
+#
+# Filnavnet ender på `.parkeret`, ikke `.yml`, og GitHub læser kun `.yml` og
+# `.yaml` direkte i `.github/workflows/`. Filen ligger her urørt, så et
+# preview pr. PR kan tages op igen uden at skulle skrives forfra.
+#
+# Den er afløst af `dev.yml`: ét fælles dev-miljø som det seneste PR med
+# label'en `dev` får. Se docs/environments.md.
+#
+# Sådan tages den i brug igen:
+#
+#   1. Omdøb til `preview.yml`.
+#   2. Slå `dev.yml` fra, eller giv de to hver sin label — de skriver begge
+#      til Pi'ens dev-database og ville ellers migrere oven i hinanden.
+#   3. Sæt agentens preview-løkke tilbage; den ligger parkeret samme sted i
+#      `infra/pi/agent/maanslogen-agent`.
+#
+# --------------------------------------------------------------------------
+
 name: Preview
 
 # Bygger PR'ets API-image og lægger det i GHCR. Pi'en henter det selv — se

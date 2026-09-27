@@ -1,7 +1,13 @@
 # Miljøer
 
-To miljøer. **Produktion** kører altid. **Dev** findes kun så længe der er et
-åbent PR — eller så længe du selv har noget kørende lokalt.
+To miljøer. **Produktion** kører altid. **Dev** er ét fælles miljø: det følger
+`main`, indtil et PR gør krav på det med label'en `dev`.
+
+Der er altså ikke et miljø pr. PR. Har tre PR'er label'en, får det seneste der
+blev bygget miljøet — de andre venter ikke i kø, de bliver bare overtaget.
+Koden til ét preview pr. PR ligger parkeret i
+[`preview.yml.parkeret`](../.github/workflows/preview.yml.parkeret) og nederst
+i agenten, så den kan tages op igen.
 
 ```
 GitHub-hosted runner            Cloudflare             Pi'en
@@ -11,12 +17,12 @@ ubuntu-24.04-arm                Workers (web)          Postgres
        │                               │                  · maanslogen_dev
        ▼                               │ fetch
      GHCR                              ▼                 api        (prod)
-  · :main                         Tunnel ─► Caddy ─►     api-dev    (main)
-  · :pr-42                                               api-pr-42  (preview)
-       │                                                      ▲
-       │   GitHub ringer på, og agenten spørger:              │
-       │     · hvilke åbne PR'er har label "preview"?          │
-       │     · er der et nyt :main-image?                      │
+  · :main                         Tunnel ─► Caddy ─►     api-dev    (dev)
+  · :dev                                                       ▲
+       │                                                       │
+       │   GitHub ringer på, og agenten spørger:               │
+       │     · har et åbent PR label'en "dev"?                 │
+       │     · er der et nyt :main- eller :dev-image?          │
        └───────────────────────────────────────────►  maanslogen-agent
 ```
 
@@ -26,14 +32,14 @@ ikke beskeden, den spørger GitHub selv og udfører kun `docker pull` og
 `docker run` med argumenter, den selv bestemmer ud fra kode der ligger på
 `main`. Se [`infra/pi/agent/`](../infra/pi/agent/).
 
-|          | Produktion              | Dev                                        |
-| -------- | ----------------------- | ------------------------------------------ |
-| Web      | Worker `maanslogen-web` | Worker-**version** pr. PR, egen URL        |
-| API      | Container på Pi'en      | Container pr. PR + ét delt dev-API         |
-| Database | `maanslogen`            | `maanslogen_dev` — **én, fælles**          |
-| Billeder | `maanslogen-media`      | `maanslogen-media-dev`                     |
-| Opstår   | Push til `main`         | Når label'en `preview` sættes              |
-| Lever    | Altid                   | Indtil label'en fjernes eller PR'et lukkes |
+|          | Produktion              | Dev                                          |
+| -------- | ----------------------- | -------------------------------------------- |
+| Web      | Worker `maanslogen-web` | Worker-**version** på det faste alias `dev`  |
+| API      | Container på Pi'en      | Én container, `api-dev`                      |
+| Database | `maanslogen`            | `maanslogen_dev` — **én, fælles**            |
+| Billeder | `maanslogen-media`      | `maanslogen-media-dev`                       |
+| Følger   | `main`                  | Seneste PR med label'en `dev`, ellers `main` |
+| Lever    | Altid                   | Altid — skifter bare hvad den viser          |
 
 ---
 
@@ -42,9 +48,11 @@ ikke beskeden, den spørger GitHub selv og udfører kun `docker pull` og
 **Web på Workers.** Next 16 kører på Workers gennem
 [`@opennextjs/cloudflare`](https://opennext.js.org/cloudflare). Bundlen er
 1,5 MB gzippet mod gratisplanens 3 MB, og gratisplanen giver 100.000
-forespørgsler om dagen. Previews bruger `wrangler versions upload`, som
-lægger en version op med sin egen URL **uden** at røre den der er udrullet.
-Derfor er der ingen Worker at rydde op i bagefter.
+forespørgsler om dagen. Dev bruger `wrangler versions upload` med aliaset
+`dev`, som lægger en version op på sin egen faste URL **uden** at røre den
+der er udrullet. Derfor er der ingen Worker at rydde op i bagefter — og
+adressen er den samme fra gang til gang, så CORS-listen på Pi'en ikke skal
+følge med fra PR til PR.
 
 **API på Pi'en.** Du spurgte om der fandtes et gratis alternativ. Kort svar:
 ikke et der er bedre end Pi'en.
@@ -54,7 +62,7 @@ ikke et der er bedre end Pi'en.
 | Render free           | Sover efter 15 minutter. Første besøgende venter ~50 sekunder.       |
 | Fly.io                | Ikke længere rigtig gratis — pay-as-you-go med et månedligt minimum. |
 | Cloudflare Containers | Kræver Workers Paid, fra 5 $/md.                                     |
-| Koyeb free            | Én tjeneste, og så er der ikke plads til previews.                   |
+| Koyeb free            | Én tjeneste, og så er der ikke plads til dev ved siden af.           |
 | Oracle Always Free    | Reelt gratis og stærk nok, men tilmelding og kapacitet driller.      |
 
 Og uanset hvad skal databasen ligge et sted med vedvarende lagring. Når
@@ -65,7 +73,7 @@ ikke være en fast IP-adresse, og Pi'ens adresse bliver aldrig offentlig.
 Skal det senere flyttes, er det kun `infra/pi/` der skal skiftes ud —
 imaget er det samme, og web'en kender kun et værtsnavn.
 
-**Én dev-database.** Previews og lokal udvikling deler `maanslogen_dev`.
+**Én dev-database.** Dev-miljøet og lokal udvikling deler `maanslogen_dev`.
 Det er enklere end en database pr. PR, og det er det du bad om. Konsekvensen
 står nedenfor, og den er værd at kende.
 
@@ -85,7 +93,7 @@ skal findes, før Pi'en kan komme op.
 | 3   | Pi'en                                             | klon, `.env`, `compose up`, skema og seed |
 | 4   | Agenten                                           | systemd-tjenesten der henter fra GHCR     |
 | 5   | Webhooken                                         | så du slipper for at vente på timeren     |
-| 6   | GitHub                                            | hemmeligheder, variabler, `preview`-label |
+| 6   | GitHub                                            | hemmeligheder, variabler, `dev`-label     |
 | 7   | Første `wrangler deploy`                          | så Worker'en findes                       |
 
 ### 1. Cloudflare
@@ -168,7 +176,7 @@ sudo chmod 600 /etc/maanslogen/pi.env
 ```
 
 Udfyld filen. Hemmeligheder genereres med `openssl rand -base64 48`, og prod og
-dev skal have **hvert sit** sæt JWT-nøgler, så et token fra et preview ikke
+dev skal have **hvert sit** sæt JWT-nøgler, så et token fra dev ikke
 virker i produktion. `CLOUDFLARE_TUNNEL_TOKEN` kommer fra
 `terraform output -raw tunnel_token`.
 
@@ -250,7 +258,7 @@ sudo systemctl start maanslogen-agent    # kør med det samme
 > 1. **Der findes et image i GHCR.** Et PR fra en fork får et skrivebeskyttet
 >    `GITHUB_TOKEN` og kan derfor ikke lægge et image op. Det er ikke en regel
 >    vi håndhæver — det er noget en fork ikke _kan_.
-> 2. **PR'et har label'en `preview`**, og labels kan kun sættes af nogen med
+> 2. **PR'et har label'en `dev`**, og labels kan kun sættes af nogen med
 >    skriveadgang. Et tilfældigt PR udefra gør altså ingenting, før du selv
 >    beder om det.
 > 3. **Grenen ligger i repoet selv.** Tjekkes både i workflowet og i agenten.
@@ -300,9 +308,8 @@ I GitHub: _Settings → Webhooks → Add webhook_
 | Events       | _Let me select individual events_ → kun **Workflow runs** |
 
 `workflow_run` er nok til det hele. Den fyrer når `Udrul` er færdig med at
-lægge et `:main`-image op, og når `Preview` er færdig med et `:pr-<n>` — og
-også når oprydningen har kørt. Ét hændelsestype dækker både udrulning,
-oprettelse og nedrivning.
+lægge et `:main`-image op, og når `Dev` er færdig med et `:dev`. Én
+hændelsestype dækker både udrulning og skift af dev-miljøet.
 
 > **Hvorfor det er forsvarligt at have en endpoint ind mod hjemmet.**
 > Beskeden er kun en dørklokke. Modtageren læser ikke indholdet, den vækker
@@ -316,8 +323,10 @@ oprettelse og nedrivning.
 
 ### 6. Hemmeligheder, variabler og label i GitHub
 
-Opret først label'en **`preview`** under _Issues → Labels_. Den er porten til
-et preview-miljø; uden den sker der ingenting, når du sætter den på et PR.
+Opret først label'en **`dev`** under _Issues → Labels_ — præcis den
+stavemåde, med småt. Den er porten til dev-miljøet; uden den sker der
+ingenting, når du sætter den på et PR. Navnet skal matche `DEV_LABEL` i
+`/etc/maanslogen/pi.env` og betingelsen i `dev.yml`.
 
 _Settings → Secrets and variables → Actions_.
 
@@ -368,21 +377,27 @@ curl -s https://maanslogen.dk -o /dev/null -w '%{http_code}\n'
 ## Sådan kører et PR
 
 1. Du åbner et PR. **Der sker ingenting endnu.**
-2. Du sætter label'en `preview`. Det er porten, og den kan kun åbnes af nogen
+2. Du sætter label'en `dev`. Det er porten, og den kan kun åbnes af nogen
    med skriveadgang.
-3. `preview.yml` bygger API-imaget på en `ubuntu-24.04-arm`-runner — native
-   arm64, og gratis på et offentligt repo — og lægger det i GHCR som
-   `:pr-<n>`. Samtidig bygges web'en og lægges op som en Worker-version med
-   aliaset `pr-<n>`, og DNS-navnet oprettes.
+3. `dev.yml` bygger API-imaget på en `ubuntu-24.04-arm`-runner — native
+   arm64, og gratis på et offentligt repo — og lægger det i GHCR som `:dev`.
+   Samtidig bygges web'en og lægges op som en Worker-version på aliaset
+   `dev`. Begge tags er faste; der oprettes ingen DNS-navne, for
+   `api.dev.<domæne>` findes allerede fra Terraform.
 4. Når workflowet er færdigt, sender GitHub en webhook til Pi'en. Agenten
-   vækkes med det samme, ser at PR'et står på listen, henter imaget, migrerer
-   dev-databasen og starter
-   `maanslogen-api-pr-<n>`. Caddy genkender `api-pr-<n>.` i Host-headeren og
-   sender videre — hverken tunnel eller Caddy skal røres.
+   vækkes med det samme, ser at et PR har label'en, henter `:dev`, migrerer
+   dev-databasen og genstarter `api-dev` på det image. Caddy kender allerede
+   værtsnavnet — hverken tunnel eller Caddy skal røres.
 5. En kommentar på PR'et får adresserne. Nye commits opdaterer den samme
    kommentar.
-6. Du fjerner label'en eller lukker PR'et. Workflowet fjerner DNS-navnet, og
-   agenten ser ved næste kørsel at PR'et er væk og stopper containeren.
+6. Du fjerner label'en fra alle PR'er. Agenten ser ved næste kørsel at ingen
+   gør krav på miljøet, og sætter `api-dev` tilbage på `:main`.
+
+**Der er ét miljø.** Sætter du label'en på PR nummer to, overtager det
+miljøet fra det første — uden at spørge, og uden at det første får besked.
+Workflowet kører i ét globalt `concurrency`-spor med `cancel-in-progress`,
+så en igangværende bygning bliver afbrudt af den næste. Det er hele
+mekanikken bag "den seneste vinder".
 
 De to adresser kan regnes ud på forhånd, så web og API ikke venter på
 hinanden. Det er også derfor `NEXT_PUBLIC_API_URL` sættes ved **build** og
@@ -390,8 +405,9 @@ ikke som en binding på Worker'en: Next inliner alt med `NEXT_PUBLIC_`-præfiks
 ind i bundlen, også i serverkoden, så en binding ville blive skygget af
 værdien der allerede står der. Det står uddybet i `apps/web/wrangler.jsonc`.
 
-Højst tre previews kører ad gangen (`MAX_PREVIEWS`). Hver tager omkring
-250 MB, og produktionen skal have plads.
+Ét dev-API ad gangen. Det var netop pladsen der var grunden til at previews
+havde et loft (`MAX_PREVIEWS`, tre stykker à ~250 MB) — med ét fælles miljø
+er det spørgsmål væk.
 
 ---
 
@@ -417,7 +433,7 @@ dev-API'et. Postgres og S3-serveren behøver ikke køre. Tilbage igen med
 `cp apps/web/.env.example apps/web/.env.local`.
 
 **Lokalt API mod dev-databasen** — når fejlen er i API-koden, men data skal
-være de samme som i previews. Databasen lytter kun på docker-netværket, så
+være de samme som i dev-miljøet. Databasen lytter kun på docker-netværket, så
 lav en tunnel først:
 
 ```bash
@@ -430,10 +446,10 @@ pnpm dev:api
 
 ## Den fælles dev-database
 
-Den deles af alle previews og af alle der udvikler lokalt. Det er enkelt, og
+Den deles af dev-miljøet og af alle der udvikler lokalt. Det er enkelt, og
 det koster:
 
-- **En migrering i et PR rammer alle andre previews med det samme.**
+- **En migrering i et PR rammer alle der udvikler lokalt med det samme.**
   Agenten kører `migrate deploy` inden containeren starter. Prisma-
   migreringer går kun fremad og er som regel additive, så det går sjældent
   galt — men et PR der fjerner en kolonne, fjerner den for alle.
@@ -467,7 +483,7 @@ FATAL: permission denied for database "maanslogen"
 DETAIL: User does not have CONNECT privilege.
 ```
 
-Den adskillelse er vigtigere end den ser ud. Uden den fik previews præcis
+Den adskillelse er vigtigere end den ser ud. Uden den fik dev-miljøet præcis
 samme credentials som produktionen, og kun databasenavnet i forbindelses-URL'en
 skilte dem ad — ét ord, som enhver kode i containeren kan ændre.
 
@@ -500,13 +516,14 @@ Gøres repoet privat, tæller de GitHub-hostede jobs med i den månedlige pulje
 | -------------------------- | ------------------ | ------ |
 | CI · typecheck, lint, test | `ubuntu-latest`    | ~2 min |
 | CI · Docker-images         | `ubuntu-latest`    | ~4 min |
-| Udrul/Preview · API-image  | `ubuntu-24.04-arm` | ~4 min |
-| Udrul/Preview · web        | `ubuntu-latest`    | ~4 min |
-| DNS og kommentar           | `ubuntu-latest`    | <1 min |
+| Udrul/Dev · API-image      | `ubuntu-24.04-arm` | ~4 min |
+| Udrul/Dev · web            | `ubuntu-latest`    | ~4 min |
+| Kommentar                  | `ubuntu-latest`    | <1 min |
 | Agent og nulstilling af db | Pi'en, ingen CI    | gratis |
 
-Cirka 15 minutter pr. push til et PR med preview, altså omkring 130 pushes om
-måneden inden for de 2.000. Bemærk at `ubuntu-24.04-arm` kun er gratis på
+Cirka 15 minutter pr. push til et PR med label'en `dev`, altså omkring 130
+pushes om måneden inden for de 2.000. Med ét miljø er der desuden højst ét
+PR der bruger dem ad gangen. Bemærk at `ubuntu-24.04-arm` kun er gratis på
 offentlige repoer — på et privat repo tæller den med som alle andre.
 
 Det eneste der reelt kan vælte tallene, er R2's Class B-operationer, og dem
@@ -522,23 +539,30 @@ Class B.
 
 ## Når noget driller
 
-**Preview'et kommer ikke op.** Tjek i rækkefølge:
+**Dev viser stadig den gamle kode.** Tjek i rækkefølge:
 
-1. Har PR'et label'en `preview`? Uden den sker der intet.
-2. Kørte `preview.yml` og lagde et image op? Se _Actions_, og
-   _Packages_ på repoet.
+1. Har PR'et label'en `dev`? Præcis den stavemåde, med småt. Uden den sker
+   der intet.
+2. Kørte `dev.yml` og lagde et image op? Se _Actions_, og _Packages_ på
+   repoet. Husk at workflowet afbrydes, hvis et andet PR gør krav på miljøet
+   imens — det er meningen, men det ligner en fejl i Actions.
 3. Har agenten set det? På Pi'en: `journalctl -u maanslogen-agent -n 50`.
-   Den skriver `pr-42: intet image i GHCR endnu — venter`, hvis den kom først.
-4. Er der plads? `MAX_PREVIEWS` er 3. Agenten tager de laveste PR-numre.
+   Den skriver `dev: label sat, men intet :dev-image endnu — bliver på main`,
+   hvis den kom først.
+4. Hvilket image kører den? `docker inspect --format '{{.Config.Image}}'
+maanslogen-api-dev`. Står der `:main`, har agenten ikke set label'en.
 
-**Preview'et svarer 502.** Caddy fandt ikke containeren.
-`docker ps | grep pr-` og `docker logs maanslogen-api-pr-<n>`. Oftest gik den
-ned ved opstart på en manglende variabel i `/etc/maanslogen/pi.env`. Husk at
-containeren kører med `--read-only`; skriver koden uden for `/tmp`, fejler den.
+**Dev svarer 502.** Caddy fandt ikke containeren.
+`docker ps | grep api-dev` og `docker logs maanslogen-api-dev`. Oftest gik den
+ned ved opstart på en manglende variabel i `/etc/maanslogen/pi.env`.
 
-**Preview'et svarer 404 med "ukendt vært".** Caddy kender ikke værtsnavnet.
-Enten passer `PROD_API_HOST`/`DEV_API_HOST` ikke med DNS, eller også er navnet
-ikke på formen `api-pr-<cifre>.`.
+**Dev svarer 404 med "ukendt vært".** Caddy kender ikke værtsnavnet.
+`PROD_API_HOST`/`DEV_API_HOST` passer ikke med DNS.
+
+**Web-siden kan ikke kalde API'et (CORS).** Dev-sidens adresse er fast
+(`https://dev-<worker>.<subdomæne>.workers.dev`), men den skal stå i
+`DEV_CORS_ORIGINS` på Pi'en. Det var netop den liste der skulle følge med fra
+PR til PR, dengang hver preview havde sin egen adresse.
 
 **Agenten gør ingenting.** `systemctl list-timers maanslogen-agent.timer`.
 Rammer du GitHubs grænse på 60 kald i timen (uautentificeret), står det i

@@ -1,0 +1,162 @@
+name: Dev
+
+# Ét fælles dev-miljø, ikke ét pr. PR.
+#
+# Sæt label'en `dev` på et PR, så bliver dét PR's kode til dev-miljøet.
+# Har tre PR'er label'en, vinder den seneste kørsel — se `concurrency`
+# nedenfor. Der er ingen kø og ingen oprydning: miljøet peger altid på det
+# sidste der blev bygget, og falder tilbage til `main` når ingen PR'er har
+# label'en (det klarer agenten på Pi'en).
+#
+# Pi'en henter selv imaget fra GHCR — se infra/pi/agent/. Der er ingen
+# selvhostet runner: intet her rører Pi'en.
+#
+# Afløser `preview.yml`, som ligger parkeret ved siden af.
+on:
+  pull_request:
+    types: [labeled, synchronize, reopened]
+
+# Nøglen til "den seneste vinder": ét globalt spor for hele miljøet, ikke ét
+# pr. PR. Sætter du label'en på PR nummer to mens det første stadig bygger,
+# bliver det første afbrudt — der er kun ét miljø at være i.
+concurrency:
+  group: dev-miljoe
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  packages: write
+  pull-requests: write
+
+jobs:
+  image:
+    name: Byg arm64-image til GHCR
+    # Label'en er porten. Den kan kun sættes af nogen med skriveadgang, så et
+    # tilfældigt PR udefra gør ingenting før du selv beder om det.
+    #
+    # Fork-tjekket er med som ekstra lag, men det afgørende er at en fork slet
+    # ikke *kan* lægge et image op: dens GITHUB_TOKEN er skrivebeskyttet.
+    if: >-
+      contains(github.event.pull_request.labels.*.name, 'dev') &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    # Gratis på offentlige repoer, og native arm64 — Pi'en skal ikke have et
+    # QEMU-emuleret image.
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/setup-buildx-action@v3
+
+      # Ét fast tag. Agenten på Pi'en ser kun `:dev` og behøver ikke vide
+      # hvilket PR der lagde det op.
+      - name: Byg og læg op
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/api/Dockerfile
+          push: true
+          platforms: linux/arm64
+          tags: ghcr.io/${{ github.repository_owner }}/maanslogen-api:dev
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  web:
+    name: Web-dev på Workers
+    if: >-
+      contains(github.event.pull_request.labels.*.name, 'dev') &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @maanslogen/contracts build
+
+      # Adressen er fast, så web ikke skal vente på hverken imaget eller
+      # Pi'en. NEXT_PUBLIC_* bages ind ved build.
+      - name: Byg til Workers
+        working-directory: apps/web
+        env:
+          NEXT_PUBLIC_API_URL: https://api.${{ vars.DEV_DOMAIN }}
+          NEXT_PUBLIC_MEDIA_URL: https://${{ vars.DEV_MEDIA_HOST }}
+        run: pnpm cf:build
+
+      # Samme faste alias hver gang. Dermed er dev-sidens adresse også fast,
+      # og Pi'ens CORS-liste behøver ikke ændre sig fra PR til PR — det var
+      # den løbende udgift ved previews.
+      - name: Læg versionen op
+        working-directory: apps/web
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          pnpm exec wrangler versions upload \
+            --preview-alias dev \
+            --message "dev ← PR #${{ github.event.pull_request.number }} — ${{ github.event.pull_request.head.sha }}"
+
+  kommentar:
+    name: Skriv adresserne på PR'et
+    needs: [image, web]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@v7
+        env:
+          WEB_URL: https://dev-${{ vars.WORKER_NAME }}.${{ vars.WORKERS_SUBDOMAIN }}
+          API_URL: https://api.${{ vars.DEV_DOMAIN }}
+        with:
+          script: |
+            const markør = '<!-- maanslogen-dev -->';
+            const brødtekst = [
+              markør,
+              '### Dev-miljøet peger nu på dette PR',
+              '',
+              '| | |',
+              '| --- | --- |',
+              `| Site | ${process.env.WEB_URL} |`,
+              `| API | ${process.env.API_URL} |`,
+              '',
+              'Imaget er lagt i GHCR som `:dev`. Pi\'en henter det selv inden',
+              'for et par minutter — den modtager ikke noget herfra.',
+              '',
+              'Der er **ét** dev-miljø. Sætter du label\'en `dev` på et andet',
+              'PR, eller skubber til det, overtager dét PR miljøet — og denne',
+              'kommentar står tilbage som historik, ikke som status.',
+              '',
+              'Kører mod den **fælles dev-database** med testdata, som dev og',
+              'lokal udvikling deler. En migrering i dette PR er allerede kørt',
+              'på den.',
+              '',
+              'Fjernes label\'en fra alle PR\'er, falder miljøet tilbage til',
+              '`main`.',
+              '',
+              '---',
+              '_Generated by [Claude Code](https://claude.ai/code)_',
+            ].join('\n');
+
+            const { data: kommentarer } = await github.rest.issues.listComments({
+              owner: context.repo.owner, repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            const eksisterende = kommentarer.find((k) => k.body.includes(markør));
+            if (eksisterende) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner, repo: context.repo.repo,
+                comment_id: eksisterende.id, body: brødtekst,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner, repo: context.repo.repo,
+                issue_number: context.issue.number, body: brødtekst,
+              });
+            }

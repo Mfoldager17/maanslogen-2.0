@@ -233,6 +233,6 @@ Det der kommer og går pr. PR gør ikke, og hvorfor står samme sted.
 | [`docs/architecture.md`](docs/architecture.md)       | Valgene bag API'et og frontend, og hvad de erstatter    |
 | [`docs/domain-model.md`](docs/domain-model.md)       | Datamodellen, felt for felt, og reglerne bag            |
 | [`docs/api.md`](docs/api.md)                         | Endpoints, paginering, filtrering og fejlformat         |
-| [`docs/environments.md`](docs/environments.md)       | Dev og produktion, PR-previews og opsætningen af det    |
+| [`docs/environments.md`](docs/environments.md)       | Dev og produktion, `dev`-label'en og opsætningen af det |
 | [`docs/deployment.md`](docs/deployment.md)           | Cloudflare R2, miljøvariabler og udrulning              |
 | [`docs/r2-omkostninger.md`](docs/r2-omkostninger.md) | Hvordan R2-forbruget holdes inden for det gratis niveau |

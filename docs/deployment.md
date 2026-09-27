@@ -1,6 +1,6 @@
 # Udrulning
 
-> Miljøerne — produktion, dev og previews pr. PR — og hvordan de sættes op:
+> Miljøerne — produktion og det fælles dev-miljø — og hvordan de sættes op:
 > [`environments.md`](environments.md). Her står detaljerne om R2, variabler
 > og selve imaget.
 
