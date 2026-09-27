@@ -1,32 +1,55 @@
 import type { Metadata, Viewport } from "next";
-import { JetBrains_Mono, Public_Sans, Space_Grotesk } from "next/font/google";
+import localFont from "next/font/local";
 import { Providers } from "./providers";
 import "@/styles/globals.css";
 
 /*
- * To skrifter med hver sin opgave. Space Grotesk til overskrifter: en
- * grotesk med tekniske træk og markante bogstavformer — den bærer
- * personligheden uden at forklæde sig som en terminal.
+ * Skrifterne ligger i repoet, ikke hos Google.
+ *
+ * `next/font/google` henter dem over nettet når der bygges, og det gjorde
+ * byggeriet afhængigt af at fonts.googleapis.com kan nås fra den maskine der
+ * bygger. I CI holdt det ikke: samme commit byggede grønt otte gange og
+ * faldt to, altid med samme fejl fra Turbopack —
+ *
+ *     Module not found: Can't resolve
+ *     '@vercel/turbopack-next/internal/font/google/font'
+ *
+ * Det er ikke en flakey test man kan køre om; det ville ramme en udrulning
+ * lige så godt som et PR. Filerne nedenfor er de præcis samme skrifter,
+ * hentet én gang fra Google og lagt i `fonts/`. Byggeriet rører ikke nettet
+ * længere, og besøgende henter ikke længere noget fra et tredjepartsdomæne.
+ *
+ * Alle tre er variable i latin-udsnittet (U+0000–00FF, så æ, ø og å er med),
+ * tilsammen 87 kB. Ét variabelt snit pr. skrift er mindre end de ni faste
+ * vægte, vi brugte før. Se fonts/README.md for hvor de kommer fra, og
+ * hvordan de opdateres.
+ *
+ * Space Grotesk til overskrifter: en grotesk med tekniske træk og markante
+ * bogstavformer — den bærer personligheden uden at forklæde sig som en
+ * terminal.
  */
-const display = Space_Grotesk({
-  subsets: ["latin"],
+const display = localFont({
+  src: "./fonts/space-grotesk-latin.woff2",
   variable: "--font-space-grotesk",
   display: "swap",
-  weight: ["500", "600", "700"],
+  // Aksens fulde spænd, ikke de vægte vi bruger i dag. Et variabelt snit
+  // indeholder dem alle, og så koster en ny vægt i designet ingenting.
+  weight: "300 700",
 });
 
 /* JetBrains Mono bruges kun til data: tal, enheder, nøgler og tastetryk. */
-const mono = JetBrains_Mono({
-  subsets: ["latin"],
+const mono = localFont({
+  src: "./fonts/jetbrains-mono-latin.woff2",
   variable: "--font-jetbrains-mono",
   display: "swap",
-  weight: ["400", "500", "700"],
+  weight: "100 800",
 });
 
-const body = Public_Sans({
-  subsets: ["latin"],
+const body = localFont({
+  src: "./fonts/public-sans-latin.woff2",
   variable: "--font-public-sans",
   display: "swap",
+  weight: "100 900",
 });
 
 export const metadata: Metadata = {
