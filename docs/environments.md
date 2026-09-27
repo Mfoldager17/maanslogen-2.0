@@ -143,6 +143,7 @@ skal findes, før Pi'en kan komme op.
 | 5   | Webhooken                                         | så du slipper for at vente på timeren     |
 | 6   | GitHub                                            | hemmeligheder, variabler, `dev`-label     |
 | 7   | Første `wrangler deploy`                          | så Worker'en findes                       |
+| 8   | Backup                                            | natligt dump af produktionen op i R2      |
 
 ### 1. Cloudflare
 
@@ -428,6 +429,97 @@ curl -s https://api-maanslogen.mathiasfoldager.com/api/v1/health/ready
 curl -s https://maanslogen.mathiasfoldager.com -o /dev/null -w '%{http_code}\n'
 ```
 
+### 8. Backup af produktionen
+
+Produktionsdatabasen findes ét sted, på én disk, i dit hjem. Booter Pi'en fra
+et SD-kort, er det også den mest sandsynlige hardwarefejl du har.
+
+Kun produktionen tages der backup af. Dev-databasen er testdata, som
+`prisma db seed` genskaber på et minut, og et dump af den ville kun være støj.
+
+Lav først en **egen** R2-token under _R2 → Manage API tokens_ med Object Read &
+Write, begrænset til `maanslogen-backup`. Ikke den samme som API'et bruger til
+billeder: kan nøglen der uploader billeder også slette dumps, er backuppen ikke
+beskyttet mod det den er der for at overleve. Læg den i env-filen som
+`R2_BACKUP_ACCESS_KEY_ID` og `R2_BACKUP_SECRET_ACCESS_KEY`.
+
+```bash
+sudo cp /opt/maanslogen/infra/pi/backup/maanslogen-backup.{service,timer} /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now maanslogen-backup.timer
+
+# Kør den med det samme frem for at vente til 03:15
+sudo systemctl start maanslogen-backup
+journalctl -u maanslogen-backup -n 20
+```
+
+En kørsel skriver fire linjer og skal ende med `oprydning`:
+
+```
+dumper maanslogen
+dump ok: 20 tabeller, 11296808 B → 2023612 B pakket
+lægger op: prod/2026-09-27T031500Z.sql.gz
+bekræftet i bucketen: 2023612 B
+oprydning: 0 ældre end 2026-08-28 slettet
+```
+
+Dumpet efterprøves **før** det lægges op, og læses tilbage **efter**. Et halvt
+dump i bucketen er værre end intet, for så ser der ud til at være backup.
+
+---
+
+## Backup og genskabelse
+
+Timeren kører 03:15 med op til et kvarters spredning, og `Persistent=true`
+betyder at en nat hvor Pi'en var slukket bliver indhentet ved næste opstart.
+Dumps beholdes 30 dage (`BACKUP_RETENTION_DAYS`).
+
+**En backup du aldrig har lagt tilbage, er ikke en backup.** Prøv det her én
+gang nu, mens der ikke er noget på spil — ikke første gang du får brug for det.
+
+```bash
+cd /opt/maanslogen/infra/pi
+. ./load-env.sh
+
+r2() {
+  curl --fail-with-body -sS --aws-sigv4 "aws:amz:auto:s3" \
+    --user "${R2_BACKUP_ACCESS_KEY_ID}:${R2_BACKUP_SECRET_ACCESS_KEY}" "$@"
+}
+vaert="https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com/${R2_BACKUP_BUCKET}"
+
+# 1. Find den nyeste. Bemærk %2F — en rå skråstreg i query-strengen får
+#    signaturen til ikke at passe, og svaret bliver 403.
+noegle=$(r2 "${vaert}?list-type=2&prefix=prod%2F" \
+  | grep -o '<Key>[^<]*</Key>' | sed 's|</\?Key>||g' | sort | tail -1)
+echo "$noegle"
+
+# 2. Hent og pak ud
+r2 "${vaert}/${noegle}" -o /tmp/genskab.sql.gz
+gunzip -f /tmp/genskab.sql.gz
+
+# 3. Læg den i en NY database først. Aldrig direkte oven i produktionen —
+#    er dumpet forkert, har du så mistet begge dele.
+docker compose --env-file "$MAANSLOGEN_ENV_FILE" exec -T postgres \
+  psql -U "$POSTGRES_USER" -d postgres -c 'CREATE DATABASE maanslogen_genskabt'
+docker compose --env-file "$MAANSLOGEN_ENV_FILE" exec -T postgres \
+  psql -U "$POSTGRES_USER" -d maanslogen_genskabt -v ON_ERROR_STOP=1 -q < /tmp/genskab.sql
+
+# 4. Se efter at der er noget i den
+docker compose --env-file "$MAANSLOGEN_ENV_FILE" exec -T postgres \
+  psql -U "$POSTGRES_USER" -d maanslogen_genskabt \
+  -c 'select count(*) from beverages' -c 'select count(*) from reviews'
+```
+
+Ser det rigtigt ud, kan `api` pekes på den nye database, eller den gamle
+omdøbes væk og den nye tage dens navn. Der er med vilje ikke noget script til
+det trin: en genskabelse er sjælden og dyr at gøre forkert, og de to linjer
+skal skrives bevidst frem for at blive kaldt.
+
+Dumpet er ren SQL med `--no-owner --no-privileges`, så det kan lægges ind
+under et andet rollenavn end det kom fra. Ved en genskabelse på en frisk
+maskine hedder rollerne sjældent det samme, og uden dem ville hver eneste
+GRANT fejle.
+
 ---
 
 ## Fra main til produktion
@@ -583,6 +675,7 @@ skema.
 | Tunnel  | Gratis                                                   |
 | DNS     | Gratis                                                   |
 | Pi'en   | Strøm                                                    |
+| Backup  | ~2 MB pr. nat, 30 dages opbevaring — 60 MB af R2' 10 GB  |
 
 **GitHub Actions.** Repoet er offentligt, og på offentlige repoer er
 GitHub-hostede runnere gratis uden loft. Målt på en rigtig kørsel: 239

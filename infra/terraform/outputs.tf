@@ -10,10 +10,11 @@ output "tunnel_token" {
 }
 
 output "r2_buckets" {
-  description = "Navnene som API'et skal have i R2_BUCKET."
+  description = "Navnene som API'et skal have i R2_BUCKET. `backup` bruges kun af Pi'ens backup-unit."
   value = {
-    prod = cloudflare_r2_bucket.media.name
-    dev  = cloudflare_r2_bucket.media_dev.name
+    prod   = cloudflare_r2_bucket.media.name
+    dev    = cloudflare_r2_bucket.media_dev.name
+    backup = cloudflare_r2_bucket.backup.name
   }
 }
 
