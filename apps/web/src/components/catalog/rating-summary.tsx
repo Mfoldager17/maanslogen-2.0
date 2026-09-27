@@ -7,13 +7,20 @@ import { formatCount, formatRating } from "@/lib/format";
  * Bedømmelsen som en aflæsning: tallet stort, fordelingen som fem målere.
  * Stjerner hører ikke til her — de er en vurdering, og det her er data.
  */
-export function RatingSummaryPanel({ rating }: { rating: RatingSummary }) {
+export function RatingSummaryPanel({
+  rating,
+  className,
+}: {
+  rating: RatingSummary;
+  className?: string;
+}) {
   const største = Math.max(1, ...Object.values(rating.distribution));
 
   return (
     <Panel
       title="Bedømmelse"
       tone="accent"
+      className={className}
       meta={rating.count === 0 ? "ingen data" : formatCount(rating.count)}
     >
       {rating.count === 0 ? (

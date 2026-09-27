@@ -68,18 +68,25 @@ export default async function BeveragePage({ params }: Params) {
         <span className="text-ink">{beverage.name}</span>
       </nav>
 
-      <div className="grid gap-8 lg:grid-cols-[20rem_1fr_16rem]">
+      {/*
+       * Tre knækpunkter, ikke ét. Med kun `lg` var billedet enten låst til
+       * 20rem eller `w-full` med fast kvadrat — og derimellem voksede det med
+       * vinduet: målt til 718×718 ved 768px bredde, altså 80% af skærmhøjden
+       * på en tablet. Fra `sm` står det derfor ved siden af teksten i en smal
+       * kolonne, og på telefon har det et loft.
+       */}
+      <div className="grid gap-8 sm:grid-cols-[minmax(0,15rem)_1fr] sm:grid-rows-[auto_1fr] lg:grid-cols-[20rem_1fr_16rem] lg:grid-rows-none">
         <MediaImage
           media={beverage.media}
           alt={beverage.name}
           variant="FULL"
           categoryName={beverage.category?.name}
-          className="aspect-square w-full rounded-[var(--radius-card)] border border-line"
-          sizes="(max-width: 1024px) 100vw, 20rem"
+          className="aspect-square w-full max-w-[22rem] rounded-[var(--radius-card)] border border-line sm:max-w-none"
+          sizes="(max-width: 640px) 100vw, (max-width: 1024px) 15rem, 20rem"
           priority
         />
 
-        <div className="flex min-w-0 flex-col gap-5">
+        <div className="flex min-w-0 flex-col gap-5 sm:row-span-2 lg:row-span-1">
           <div>
             <div className="mb-2 flex flex-wrap items-center gap-2 text-sm">
               {beverage.brand ? (
@@ -143,7 +150,7 @@ export default async function BeveragePage({ params }: Params) {
           ) : null}
         </div>
 
-        <RatingSummaryPanel rating={beverage.rating} />
+        <RatingSummaryPanel rating={beverage.rating} className="self-start" />
       </div>
 
       <div className="mt-12 grid gap-10 lg:grid-cols-[20rem_1fr]">
