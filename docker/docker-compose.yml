@@ -80,6 +80,13 @@ services:
   # Alternativet var at droppe `Cache-Control` lokalt, men så ville uploadstien
   # lokalt og mod R2 ikke længere være den samme — præcis den fælde vi undgik
   # ved at fravælge s3mock.
+  #
+  # Bemærk at ligheden gælder forespørgslen, ikke det gemte objekt: Alarik tager
+  # imod `Cache-Control` uden at gemme den (der er ingen håndtering af den i
+  # dens kildekode), så lokalt serveres billeder uden cache-instruks. Målt på en
+  # rigtig upload. Det har ingen betydning i produktionen — R2 gemmer headeren,
+  # og edge-cachen garanteres alligevel af Cache Rule'en — men det er værd at
+  # vide før man fejlsøger en manglende header lokalt.
   s3:
     image: nginx:1.29-alpine
     restart: unless-stopped

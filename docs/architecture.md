@@ -231,6 +231,12 @@ begyndte i marts 2026 at kræve et login-token for overhovedet at starte — ogs
 gratisudgaven. Alarik er Apache 2.0 uden licensserver og kan ikke gøre det samme.
 Se kommentarerne i `docker/docker-compose.yml`.
 
+Én forskel er værd at kende: Alarik gemmer ikke `Cache-Control`. Headeren sendes
+stadig med den presignede PUT — så uploadstien er den samme som mod R2, og en
+fejl i vores presign ville stadig vise sig lokalt — men objektet serveres uden
+cache-instruks. R2 gemmer den, og edge-cachen garanteres af Cache Rule'en, så
+det er alene et lokalt forhold.
+
 ### Uploadforløbet
 
 1. Klienten beder om presignede URL'er for de varianter den skal bruge.
