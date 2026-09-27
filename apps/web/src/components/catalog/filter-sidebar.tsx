@@ -1,12 +1,13 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { useTransition } from "react";
-import type { AttributeDefinition, BeverageFacets } from "@maanslogen/contracts";
+import { useState, useTransition } from "react";
+import type { AttributeDefinition, BeverageFacets, FacetBucket } from "@maanslogen/contracts";
 import { toggleInList, withParams } from "@/lib/query-state";
 import { cn } from "@/lib/cn";
 import { formatCountry } from "@/lib/format";
 import { dynamicRoute } from "@/lib/routes";
+import { StarRating } from "@/components/ui/star-rating";
 
 /**
  * Facetterne kommer fra API'et sammen med tællingerne, og attributfiltrene
@@ -36,7 +37,9 @@ export function FilterSidebar({
   // Facetterne svarer med slugs, så filteret skal sendes som slugs. Det er
   // `typeSlugs`, ikke `typeIds` — sidstnævnte valideres som UUID'er.
   const selectedTypes = (params.get("typeSlugs") ?? "").split(",").filter(Boolean);
+  const selectedBrands = (params.get("brandSlugs") ?? "").split(",").filter(Boolean);
   const selectedCountries = (params.get("countryCodes") ?? "").split(",").filter(Boolean);
+  const minRating = params.get("minRating");
 
   function toggleCsv(key: string, value: string) {
     const current = (params.get(key) ?? "").split(",").filter(Boolean);
@@ -51,43 +54,84 @@ export function FilterSidebar({
       className={cn("flex flex-col gap-7", pending && "opacity-60 transition-opacity", className)}
       aria-busy={pending}
     >
-      <FacetGroup title="Kategori">
-        {facets.categories.map((bucket) => (
-          <FacetCheckbox
-            key={bucket.value}
-            label={bucket.label}
-            count={bucket.count}
-            checked={params.get("categorySlug") === bucket.value}
-            onChange={(checked) => apply({ categorySlug: checked ? bucket.value : null })}
-          />
-        ))}
-      </FacetGroup>
-
-      {facets.types.length > 0 ? (
-        <FacetGroup title="Type">
-          {facets.types.map((bucket) => (
+      {facets.categories.length > 0 ? (
+        <FacetGroup title="Kategori">
+          {facets.categories.map((bucket) => (
             <FacetCheckbox
               key={bucket.value}
               label={bucket.label}
               count={bucket.count}
-              checked={selectedTypes.includes(bucket.value)}
-              onChange={() => toggleCsv("typeSlugs", bucket.value)}
+              checked={params.get("categorySlug") === bucket.value}
+              onChange={(checked) => apply({ categorySlug: checked ? bucket.value : null })}
             />
           ))}
         </FacetGroup>
       ) : null}
 
+      {facets.types.length > 0 ? (
+        <FacetGroup title="Type">
+          <FacetList
+            buckets={facets.types}
+            selected={selectedTypes}
+            onToggle={(value) => toggleCsv("typeSlugs", value)}
+            søgeetiket="Søg i typer"
+          />
+        </FacetGroup>
+      ) : null}
+
+      {/*
+       * Mærkerne kom fra API'et hele tiden — 60 facetter med tællinger — men
+       * blev aldrig vist, så man kunne kun nå dem ved at klikke mærket på en
+       * drikkevare. De er for mange til en ren afkrydsningsliste, deraf
+       * søgefeltet og klipningen i `FacetList`.
+       */}
+      {facets.brands.length > 0 ? (
+        <FacetGroup title="Mærke">
+          <FacetList
+            buckets={facets.brands}
+            selected={selectedBrands}
+            onToggle={(value) => toggleCsv("brandSlugs", value)}
+            søgeetiket="Søg i mærker"
+          />
+        </FacetGroup>
+      ) : null}
+
+      <FacetGroup title="Bedømmelse">
+        {[4, 3, 2].map((grænse) => (
+          <label
+            key={grænse}
+            className="flex cursor-pointer items-center gap-2.5 text-sm"
+            title={`Mindst ${grænse} stjerner`}
+          >
+            <input
+              type="radio"
+              name="minRating"
+              checked={minRating === String(grænse)}
+              // Et klik på den valgte rydder filteret igen. Uden dette kunne
+              // man kun skifte mellem grænser, aldrig komme tilbage til alle.
+              onClick={() =>
+                apply({ minRating: minRating === String(grænse) ? null : String(grænse) })
+              }
+              onChange={() => undefined}
+              className="h-4 w-4 accent-[var(--accent)]"
+            />
+            <StarRating value={grænse} size="sm" showValue={false} />
+            <span className="text-ink-muted">og op</span>
+          </label>
+        ))}
+      </FacetGroup>
+
       {facets.countries.length > 0 ? (
         <FacetGroup title="Land">
-          {facets.countries.map((bucket) => (
-            <FacetCheckbox
-              key={bucket.value}
-              label={formatCountry(bucket.value) ?? bucket.value}
-              count={bucket.count}
-              checked={selectedCountries.includes(bucket.value)}
-              onChange={() => toggleCsv("countryCodes", bucket.value)}
-            />
-          ))}
+          <FacetList
+            buckets={facets.countries.map((bucket) => ({
+              ...bucket,
+              label: formatCountry(bucket.value) ?? bucket.value,
+            }))}
+            selected={selectedCountries}
+            onToggle={(value) => toggleCsv("countryCodes", value)}
+            søgeetiket="Søg i lande"
+          />
         </FacetGroup>
       ) : null}
 
@@ -132,6 +176,112 @@ function FacetGroup({ title, children }: { title: string; children: React.ReactN
       </h2>
       <div className="flex flex-col gap-2.5">{children}</div>
     </section>
+  );
+}
+
+/**
+ * Søgning uden hensyn til accenter og versaler. Uden foldningen fandt "moe"
+ * ikke "Moët & Chandon", og "oster" ikke "Øster Bryggeri" — på en dansk side
+ * med franske og danske mærker er det de fleste af de interessante opslag.
+ */
+function fold(tekst: string): string {
+  return tekst
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .replace(/ø/g, "o")
+    .replace(/æ/g, "ae")
+    .replace(/å/g, "a");
+}
+
+/**
+ * Afkrydsningsliste der kan tåle at være lang. Over `GRÆNSE` poster klippes
+ * listen, og over `SØGEGRÆNSE` kommer der et søgefelt — mærkefacetten er 60
+ * poster, og den er ubrugelig som én lang række felter.
+ *
+ * Valgte poster vises altid, også når de ligger uden for klipningen: ellers
+ * kunne man slå et filter til, rulle videre, og ikke finde det igen.
+ */
+function FacetList({
+  buckets,
+  selected,
+  onToggle,
+  søgeetiket,
+}: {
+  buckets: FacetBucket[];
+  selected: string[];
+  onToggle: (value: string) => void;
+  søgeetiket: string;
+}) {
+  const GRÆNSE = 8;
+  const SØGEGRÆNSE = 12;
+  const [søg, setSøg] = useState("");
+  const [udvidet, setUdvidet] = useState(false);
+
+  /*
+   * Et valgt filter uden træffere i sin egen dimension — fx et mærke der ikke
+   * har nogen drikkevare med mindst fire stjerner — findes ikke i facetterne.
+   * Uden denne linje forsvandt afkrydsningsfeltet, og så kunne man ikke slå
+   * filteret fra igen uden at rydde alt.
+   */
+  const alle: FacetBucket[] = [
+    ...buckets,
+    ...selected
+      .filter((value) => !buckets.some((bucket) => bucket.value === value))
+      .map((value) => ({ value, label: value, count: 0 })),
+  ];
+
+  const nål = fold(søg);
+  const fundet = nål ? alle.filter((b) => fold(b.label).includes(nål)) : alle;
+
+  const synlige =
+    udvidet || nål
+      ? fundet
+      : [
+          ...fundet.slice(0, GRÆNSE),
+          ...fundet.slice(GRÆNSE).filter((b) => selected.includes(b.value)),
+        ];
+
+  const skjulte = fundet.length - synlige.length;
+
+  return (
+    <>
+      {alle.length > SØGEGRÆNSE ? (
+        <input
+          type="search"
+          value={søg}
+          onChange={(event) => setSøg(event.target.value)}
+          placeholder={søgeetiket}
+          aria-label={søgeetiket}
+          className="mb-0.5 h-8 w-full rounded-[var(--radius-control)] border border-line-strong bg-surface px-2.5 text-sm"
+        />
+      ) : null}
+
+      {synlige.map((bucket) => (
+        <FacetCheckbox
+          key={bucket.value}
+          label={bucket.label}
+          count={bucket.count}
+          checked={selected.includes(bucket.value)}
+          onChange={() => onToggle(bucket.value)}
+        />
+      ))}
+
+      {nål && fundet.length === 0 ? (
+        <p className="text-xs text-ink-muted">Ingen træffere.</p>
+      ) : null}
+
+      {!nål && (skjulte > 0 || udvidet) ? (
+        <button
+          type="button"
+          onClick={() => setUdvidet((forrige) => !forrige)}
+          className="self-start text-xs font-semibold text-accent underline underline-offset-2 hover:text-accent-hover"
+        >
+          {udvidet ? "Vis færre" : `Vis alle (${fundet.length})`}
+        </button>
+      ) : null}
+    </>
   );
 }
 

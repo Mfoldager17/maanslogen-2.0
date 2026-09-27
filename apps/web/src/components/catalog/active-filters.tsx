@@ -17,11 +17,13 @@ export function ActiveFilters({
   filterable,
   categoryLabel,
   typeLabels,
+  brandLabels,
 }: {
   filterable: AttributeDefinition[];
   categoryLabel?: string;
   /** Slug → navn, så chippen viser "Single malt" og ikke slug'en. */
   typeLabels?: Record<string, string>;
+  brandLabels?: Record<string, string>;
 }) {
   const router = useRouter();
   const params = useSearchParams();
@@ -48,6 +50,14 @@ export function ActiveFilters({
     });
   }
 
+  const brands = (params.get("brandSlugs") ?? "").split(",").filter(Boolean);
+  if (brands.length) {
+    chips.push({
+      key: "brandSlugs",
+      label: brands.map((slug) => brandLabels?.[slug] ?? slug).join(", "),
+    });
+  }
+
   const countries = (params.get("countryCodes") ?? "").split(",").filter(Boolean);
   if (countries.length) {
     chips.push({
@@ -57,7 +67,7 @@ export function ActiveFilters({
   }
 
   const minRating = params.get("minRating");
-  if (minRating) chips.push({ key: "minRating", label: `Mindst ${minRating} stjerner` });
+  if (minRating) chips.push({ key: "minRating", label: `${minRating} stjerner og op` });
 
   for (const definition of filterable) {
     const raw = params.get(`attr[${definition.key}]`);

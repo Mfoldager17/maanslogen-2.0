@@ -174,6 +174,8 @@ export const facetBucketSchema = z.object({
   count: z.number().int().nonnegative(),
 });
 
+export type FacetBucket = z.infer<typeof facetBucketSchema>;
+
 export const beverageFacetsSchema = z
   .object({
     categories: z.array(facetBucketSchema),

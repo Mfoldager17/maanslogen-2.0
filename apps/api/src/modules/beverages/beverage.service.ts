@@ -82,19 +82,72 @@ export class BeverageService {
   /**
    * Facetter for det aktuelle filter, så sidebaren kan vise "Stout (48)"
    * og gråne de valg der ikke giver resultater.
+   *
+   * Hver dimension beregnes uden sit *eget* filter. Med ét fælles `where` til
+   * alle fire fjernede et valgt mærke alle andre mærker fra mærkefacetten, og
+   * kombinationen mærke + bedømmelse tømte Type, Mærke og Land helt: sidebaren
+   * mistede de felter man skulle bruge for at komme ud igen, og chip-rækken
+   * faldt tilbage til at vise slug'en, fordi navnet kom fra netop de facetter
+   * der nu var tomme. Målt på `?brandSlugs=…&minRating=4`: ét afkrydsningsfelt
+   * tilbage i hele sidebaren.
+   *
+   * Sådan opfører facetteret søgning sig også alle andre steder: at vælge
+   * "Balbegie" ændrer tællingerne i de *øvrige* dimensioner, men lader
+   * mærkelisten stå, så man kan skifte mærke med ét klik.
    */
   async facets(query: BeverageListQuery): Promise<BeverageFacets> {
-    const where = this.buildWhere(query);
+    const udenEgetFilter = (udeladt: Partial<BeverageListQuery>) =>
+      this.buildWhere({ ...query, ...udeladt });
 
-    const [byType, byBrand, byCountry] = await Promise.all([
-      this.prisma.beverage.groupBy({ by: ['typeId'], where, _count: { _all: true } }),
-      this.prisma.beverage.groupBy({ by: ['brandId'], where, _count: { _all: true } }),
-      this.prisma.beverage.groupBy({ by: ['countryCode'], where, _count: { _all: true } }),
+    const typeWhere = udenEgetFilter({
+      typeId: undefined,
+      typeIds: undefined,
+      typeSlugs: undefined,
+    });
+    const brandWhere = udenEgetFilter({
+      brandId: undefined,
+      brandIds: undefined,
+      brandSlugs: undefined,
+    });
+    const countryWhere = udenEgetFilter({ countryCodes: undefined });
+    // Kategorifacetten skal kunne skiftes lige så frit, og kategorien er en
+    // egenskab ved typen — så både kategori- og typevalget udelades her.
+    const categoryWhere = udenEgetFilter({
+      categoryId: undefined,
+      categorySlug: undefined,
+      typeId: undefined,
+      typeIds: undefined,
+      typeSlugs: undefined,
+    });
+
+    const [byType, byBrand, byCountry, byTypeForCategories] = await Promise.all([
+      this.prisma.beverage.groupBy({
+        by: ['typeId'],
+        where: typeWhere,
+        _count: { _all: true },
+      }),
+      this.prisma.beverage.groupBy({
+        by: ['brandId'],
+        where: brandWhere,
+        _count: { _all: true },
+      }),
+      this.prisma.beverage.groupBy({
+        by: ['countryCode'],
+        where: countryWhere,
+        _count: { _all: true },
+      }),
+      this.prisma.beverage.groupBy({
+        by: ['typeId'],
+        where: categoryWhere,
+        _count: { _all: true },
+      }),
     ]);
+
+    const alleTypeIds = [...new Set([...byType, ...byTypeForCategories].map((row) => row.typeId))];
 
     const [types, brands] = await Promise.all([
       this.prisma.beverageType.findMany({
-        where: { id: { in: byType.map((row) => row.typeId) } },
+        where: { id: { in: alleTypeIds } },
         select: { id: true, name: true, slug: true, categoryId: true },
       }),
       this.prisma.brand.findMany({
@@ -107,7 +160,7 @@ export class BeverageService {
     const brandById = new Map(brands.map((brand) => [brand.id, brand]));
 
     const categoryCounts = new Map<string, number>();
-    for (const row of byType) {
+    for (const row of byTypeForCategories) {
       const type = typeById.get(row.typeId);
       if (!type) continue;
       categoryCounts.set(

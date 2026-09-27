@@ -52,6 +52,9 @@ export default async function CatalogPage({
   // Facetterne kender allerede navnet bag hver slug; chippen skal ikke
   // hente det en gang til.
   const typeLabels = Object.fromEntries(facets.types.map((bucket) => [bucket.value, bucket.label]));
+  const brandLabels = Object.fromEntries(
+    facets.brands.map((bucket) => [bucket.value, bucket.label]),
+  );
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
@@ -84,6 +87,7 @@ export default async function CatalogPage({
           filterable={filterable}
           categoryLabel={categoryLabel}
           typeLabels={typeLabels}
+          brandLabels={brandLabels}
         />
       </div>
 
