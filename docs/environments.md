@@ -27,7 +27,7 @@ i agenten, så den kan tages op igen.
 GitHub-hosted runner            Cloudflare             Pi'en
 ────────────────────            ──────────             ─────────────────────
 ubuntu-24.04-arm                Workers (web)          Postgres
-  bygger arm64-image              maanslogen.dk          · maanslogen
+  bygger arm64-image              maanslogen-web          · maanslogen
        │                               │                  · maanslogen_dev
        ▼                               │ fetch
      GHCR                              ▼                 api         (:prod)
@@ -94,6 +94,39 @@ står nedenfor, og den er værd at kende.
 
 ---
 
+## Hvorfor navnene ser sådan ud
+
+Alle værtsnavne har formen `<rolle>-maanslogen.mathiasfoldager.com`:
+
+| Rolle        | Værtsnavn                                    |
+| ------------ | -------------------------------------------- |
+| Site         | `maanslogen.mathiasfoldager.com`             |
+| API          | `api-maanslogen.mathiasfoldager.com`         |
+| API staging  | `api-staging-maanslogen.mathiasfoldager.com` |
+| API dev      | `api-dev-maanslogen.mathiasfoldager.com`     |
+| Billeder     | `media-maanslogen.mathiasfoldager.com`       |
+| Billeder dev | `media-dev-maanslogen.mathiasfoldager.com`   |
+| Webhook      | `deploy-maanslogen.mathiasfoldager.com`      |
+
+Bindestreg mellem rolle og projekt, ikke punktum — og det er ikke en smagssag.
+Cloudflares gratis universalcertifikat dækker `*.mathiasfoldager.com`, men
+**ikke** `*.*.mathiasfoldager.com`. Et navn som `api.dev.maanslogen.mathiasfoldager.com`
+ville derfor stå uden certifikat og kun kunne nås gennem et betalt Advanced
+Certificate. Ét niveau under zonen, altid.
+
+Det er også derfor `COOKIE_DOMAIN` ikke sættes: se
+[`deployment.md`](deployment.md#cookies-på-tværs-af-værter).
+
+De fem navne Terraform opretter — API'erne og billeddomænerne — bygges ét
+sted, i `local.vaert` i
+[`infra/terraform/variables.tf`](../infra/terraform/variables.tf). Den dag
+`maanslogen.com` er købt, er det de fem linjer der bliver til
+`api.maanslogen.com` osv., og `dns.tf` og `cache.tf` læser derfra.
+
+Sitet ligger på en Worker og har ingen DNS-record her; webhook-navnet
+oprettes af [`infra/scripts/dns-record.sh`](../infra/scripts/dns-record.sh).
+De to skal rettes i hånden.
+
 ## Sæt det op
 
 Én gang. Regn med en times tid.
@@ -136,8 +169,8 @@ Bagefter, i hånden i dashboardet:
 
 - **Tunnelens ingress**: én regel, alt videre til `http://caddy:8080`.
 - **R2 → hver bucket → Settings → Public access → Custom domains**: knyt
-  `media.maanslogen.dk` til prod-bucketen og `media.dev.maanslogen.dk` til
-  dev-bucketen.
+  `media-maanslogen.mathiasfoldager.com` til prod-bucketen og
+  `media-dev-maanslogen.mathiasfoldager.com` til dev-bucketen.
 - **Caching → Tiered Cache**: slå Smart Tiered Caching til. Gratis, og det
   skærer i Class B-operationerne. Se [`r2-omkostninger.md`](r2-omkostninger.md).
 
@@ -298,7 +331,7 @@ På Pi'en:
 ```bash
 # Læg hemmeligheden i samme fil som resten
 echo "WEBHOOK_SECRET=$(openssl rand -hex 32)" | sudo tee -a /etc/maanslogen/pi.env
-echo "DEPLOY_HOST=deploy.maanslogen.dk" | sudo tee -a /etc/maanslogen/pi.env
+echo "DEPLOY_HOST=deploy-maanslogen.mathiasfoldager.com" | sudo tee -a /etc/maanslogen/pi.env
 
 sudo cp /opt/maanslogen/infra/pi/agent/maanslogen-webhook.service /etc/systemd/system/
 sudo systemctl daemon-reload
@@ -310,14 +343,14 @@ DNS for `deploy.<domæne>` oprettes som de øvrige:
 
 ```bash
 CF_API_TOKEN=... CF_ZONE_ID=... CF_TUNNEL_ID=... \
-  infra/scripts/dns-record.sh upsert deploy.maanslogen.dk
+  infra/scripts/dns-record.sh upsert deploy-maanslogen.mathiasfoldager.com
 ```
 
 I GitHub: _Settings → Webhooks → Add webhook_
 
 | Felt         | Værdi                                                     |
 | ------------ | --------------------------------------------------------- |
-| Payload URL  | `https://deploy.maanslogen.dk/github`                     |
+| Payload URL  | `https://deploy-maanslogen.mathiasfoldager.com/github`    |
 | Content type | `application/json`                                        |
 | Secret       | den samme streng som `WEBHOOK_SECRET`                     |
 | Events       | _Let me select individual events_ → kun **Workflow runs** |
@@ -356,15 +389,19 @@ Secrets:
 
 Variables:
 
-| Navn                | Eksempel                    |
-| ------------------- | --------------------------- |
-| `WORKER_NAME`       | `maanslogen-web`            |
-| `WORKERS_SUBDOMAIN` | `dit-navn.workers.dev`      |
-| `DEV_DOMAIN`        | `dev.maanslogen.dk`         |
-| `PROD_API_HOST`     | `api.maanslogen.dk`         |
-| `STAGING_API_HOST`  | `api.staging.maanslogen.dk` |
-| `PROD_MEDIA_HOST`   | `media.maanslogen.dk`       |
-| `DEV_MEDIA_HOST`    | `media.dev.maanslogen.dk`   |
+| Navn                | Eksempel                                     |
+| ------------------- | -------------------------------------------- |
+| `WORKER_NAME`       | `maanslogen-web`                             |
+| `WORKERS_SUBDOMAIN` | `dit-navn.workers.dev`                       |
+| `PROD_API_HOST`     | `api-maanslogen.mathiasfoldager.com`         |
+| `STAGING_API_HOST`  | `api-staging-maanslogen.mathiasfoldager.com` |
+| `DEV_API_HOST`      | `api-dev-maanslogen.mathiasfoldager.com`     |
+| `PROD_MEDIA_HOST`   | `media-maanslogen.mathiasfoldager.com`       |
+| `DEV_MEDIA_HOST`    | `media-dev-maanslogen.mathiasfoldager.com`   |
+
+Alle fem er hele værtsnavne. Der var før en `DEV_DOMAIN`, som workflowet satte
+`api.` foran — den findes ikke længere, netop fordi navnene ikke stables i
+niveauer mere. Se «Hvorfor navnene ser sådan ud» ovenfor.
 
 `STAGING_API_HOST` bruges af staging-workflowet; billederne henter staging fra
 `DEV_MEDIA_HOST`, fordi den deler bucket med dev.
@@ -373,7 +410,7 @@ Variables:
 
 ```bash
 cd apps/web
-CLOUDFLARE_API_TOKEN=... NEXT_PUBLIC_API_URL=https://api.maanslogen.dk pnpm cf:deploy
+CLOUDFLARE_API_TOKEN=... NEXT_PUBLIC_API_URL=https://api-maanslogen.mathiasfoldager.com pnpm cf:deploy
 ```
 
 Worker'en skal findes én gang, før `versions upload` kan lægge versioner op i
@@ -387,8 +424,8 @@ docker ps                              # postgres, api, api-dev, caddy, cloudfla
 journalctl -u maanslogen-agent -n 20   # "api: opdateret" eller ingen ændring
 
 # Udefra
-curl -s https://api.maanslogen.dk/api/v1/health/ready
-curl -s https://maanslogen.dk -o /dev/null -w '%{http_code}\n'
+curl -s https://api-maanslogen.mathiasfoldager.com/api/v1/health/ready
+curl -s https://maanslogen.mathiasfoldager.com -o /dev/null -w '%{http_code}\n'
 ```
 
 ---

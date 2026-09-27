@@ -88,7 +88,7 @@ jobs:
       - name: Byg til Workers
         working-directory: apps/web
         env:
-          NEXT_PUBLIC_API_URL: https://api.${{ vars.DEV_DOMAIN }}
+          NEXT_PUBLIC_API_URL: https://${{ vars.DEV_API_HOST }}
           NEXT_PUBLIC_MEDIA_URL: https://${{ vars.DEV_MEDIA_HOST }}
         run: pnpm cf:build
 
@@ -113,7 +113,7 @@ jobs:
       - uses: actions/github-script@v7
         env:
           WEB_URL: https://dev-${{ vars.WORKER_NAME }}.${{ vars.WORKERS_SUBDOMAIN }}
-          API_URL: https://api.${{ vars.DEV_DOMAIN }}
+          API_URL: https://${{ vars.DEV_API_HOST }}
         with:
           script: |
             const markør = '<!-- maanslogen-dev -->';

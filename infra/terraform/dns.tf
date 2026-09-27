@@ -1,4 +1,5 @@
-# De faste navne. Preview-navnene (api-pr-42.dev...) hører ikke til her:
+# De faste navne, alle bygget af local.vaert i variables.tf. Preview-navnene
+# (api-pr-42-...) hører ikke til her:
 # de kommer og går med de enkelte PR'er, og infra/scripts/dns-record.sh
 # opretter og fjerner dem. Terraform og et workflow bør ikke redigere de
 # samme ressourcer — det ville give drift hver gang et PR åbnes.
@@ -10,7 +11,7 @@ locals {
 # API'et i produktion, gennem tunnelen til Pi'en.
 resource "cloudflare_dns_record" "api" {
   zone_id = var.zone_id
-  name    = "api.${var.domain}"
+  name    = local.vaert.api
   type    = "CNAME"
   content = local.tunnel_target
   # Proxy'et er påkrævet: cfargotunnel.com kan kun nås gennem Cloudflare.
@@ -23,7 +24,7 @@ resource "cloudflare_dns_record" "api" {
 # Det delte dev-API. Peger på samme tunnel; Caddy skelner på værtsnavnet.
 resource "cloudflare_dns_record" "api_dev" {
   zone_id = var.zone_id
-  name    = "api.${local.dev_domain}"
+  name    = local.vaert.api_dev
   type    = "CNAME"
   content = local.tunnel_target
   proxied = true
@@ -33,7 +34,7 @@ resource "cloudflare_dns_record" "api_dev" {
 
 resource "cloudflare_dns_record" "api_staging" {
   zone_id = var.zone_id
-  name    = "api.${local.staging_domain}"
+  name    = local.vaert.api_staging
   type    = "CNAME"
   content = local.tunnel_target
   proxied = true
@@ -46,7 +47,7 @@ resource "cloudflare_dns_record" "api_staging" {
 # recorden her findes for at domænet er reserveret og dokumenteret.
 resource "cloudflare_dns_record" "media" {
   zone_id = var.zone_id
-  name    = "media.${var.domain}"
+  name    = local.vaert.media
   type    = "CNAME"
   content = "public.r2.dev"
   proxied = true
@@ -56,7 +57,7 @@ resource "cloudflare_dns_record" "media" {
 
 resource "cloudflare_dns_record" "media_dev" {
   zone_id = var.zone_id
-  name    = "media.${local.dev_domain}"
+  name    = local.vaert.media_dev
   type    = "CNAME"
   content = "public.r2.dev"
   proxied = true

@@ -20,7 +20,16 @@ output "r2_buckets" {
 output "api_hosts" {
   description = "Værtsnavnene Caddyfile'en skal kende."
   value = {
-    prod = cloudflare_dns_record.api.name
-    dev  = cloudflare_dns_record.api_dev.name
+    prod    = cloudflare_dns_record.api.name
+    staging = cloudflare_dns_record.api_staging.name
+    dev     = cloudflare_dns_record.api_dev.name
+  }
+}
+
+output "media_hosts" {
+  description = "Billeddomænerne. Ind i GitHub som PROD_MEDIA_HOST og DEV_MEDIA_HOST."
+  value = {
+    prod = cloudflare_dns_record.media.name
+    dev  = cloudflare_dns_record.media_dev.name
   }
 }

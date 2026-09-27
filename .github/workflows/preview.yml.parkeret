@@ -14,6 +14,13 @@
 #      til Pi'ens dev-database og ville ellers migrere oven i hinanden.
 #   3. Sæt agentens preview-løkke tilbage; den ligger parkeret samme sted i
 #      `infra/pi/agent/maanslogen-agent`.
+#   4. Ret navnene. Filen bygger `api-pr-42.${{ vars.DEV_DOMAIN }}`, altså et
+#      navn i to niveauer. Den variabel findes ikke længere, og formen duer
+#      ikke på nuværende domæne: Cloudflares gratis universalcertifikat dækker
+#      `*.mathiasfoldager.com`, men ikke `*.*.mathiasfoldager.com`. Brug ét
+#      niveau — `api-pr-42-maanslogen.mathiasfoldager.com` — og læs navnet fra
+#      en variabel som resten gør. Se «Hvorfor navnene ser sådan ud» i
+#      docs/environments.md.
 #
 # --------------------------------------------------------------------------
 

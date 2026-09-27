@@ -209,7 +209,7 @@ PR, alle mod den samme dev-database med testdata.
 
 ```bash
 # Web til Workers
-cd apps/web && NEXT_PUBLIC_API_URL=https://api.maanslogen.dk pnpm cf:deploy
+cd apps/web && NEXT_PUBLIC_API_URL=https://api-maanslogen.mathiasfoldager.com pnpm cf:deploy
 
 # API'et som image
 docker build -f apps/api/Dockerfile -t maanslogen-api .
