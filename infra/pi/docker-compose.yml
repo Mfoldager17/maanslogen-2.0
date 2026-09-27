@@ -46,7 +46,9 @@ services:
 
   # ---- API i produktion --------------------------------------------------
   api:
-    image: ${GHCR_IMAGE:-ghcr.io/mfoldager17/maanslogen-api}:main
+    # :prod flyttes kun af et release i GitHub — se .github/workflows/release.yml.
+    # Et push til main rører den ikke; det går til api-staging nedenfor.
+    image: ${GHCR_IMAGE:-ghcr.io/mfoldager17/maanslogen-api}:prod
     restart: unless-stopped
     depends_on:
       postgres:
@@ -85,9 +87,38 @@ services:
       DATABASE_URL: postgresql://maanslogen_dev:${DEV_POSTGRES_PASSWORD}@postgres:5432/maanslogen_dev?schema=public
       JWT_ACCESS_SECRET: ${DEV_JWT_ACCESS_SECRET}
       JWT_REFRESH_SECRET: ${DEV_JWT_REFRESH_SECRET}
-      # Previews ligger på skiftende workers.dev-adresser, og en lokal
-      # udvikler kommer fra localhost. Begge skal kunne kalde med cookies.
+      # Dev-siden ligger på et fast workers.dev-alias, og en lokal udvikler
+      # kommer fra localhost. Begge skal kunne kalde med cookies.
       CORS_ORIGINS: ${DEV_CORS_ORIGINS}
+      STORAGE_DRIVER: r2
+      R2_ACCOUNT_ID: ${R2_ACCOUNT_ID}
+      R2_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID}
+      R2_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY}
+      R2_BUCKET: ${R2_DEV_BUCKET}
+      R2_PUBLIC_BASE_URL: ${DEV_MEDIA_PUBLIC_URL}
+      ENABLE_SWAGGER: 'true'
+    networks: [maanslogen-dev]
+
+  # ---- Staging -----------------------------------------------------------
+  # main-grenens kode. Følger :main, som push til main lægger op.
+  #
+  # Deler database og billedbucket med dev. Det er et bevidst valg: staging
+  # findes for at køre main et rigtigt sted før et release, ikke for at have
+  # sit eget datasæt. Derfor også de samme JWT-nøgler som dev — tokens
+  # valideres mod brugerne i netop den database.
+  api-staging:
+    image: ${GHCR_IMAGE:-ghcr.io/mfoldager17/maanslogen-api}:main
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: '4000'
+      DATABASE_URL: postgresql://maanslogen_dev:${DEV_POSTGRES_PASSWORD}@postgres:5432/maanslogen_dev?schema=public
+      JWT_ACCESS_SECRET: ${DEV_JWT_ACCESS_SECRET}
+      JWT_REFRESH_SECRET: ${DEV_JWT_REFRESH_SECRET}
+      CORS_ORIGINS: ${STAGING_CORS_ORIGINS}
       STORAGE_DRIVER: r2
       R2_ACCOUNT_ID: ${R2_ACCOUNT_ID}
       R2_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID}
@@ -110,6 +141,7 @@ services:
     # be null". Det ville tage hele routeren ned — også produktionen.
     environment:
       PROD_API_HOST: ${PROD_API_HOST}
+      STAGING_API_HOST: ${STAGING_API_HOST}
       DEV_API_HOST: ${DEV_API_HOST}
       DEPLOY_HOST: ${DEPLOY_HOST}
     # Webhook-modtageren kører på værten, ikke i en container. Uden dette

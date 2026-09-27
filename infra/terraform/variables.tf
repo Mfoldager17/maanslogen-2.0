@@ -20,11 +20,18 @@ variable "domain" {
 }
 
 variable "dev_domain" {
-  description = "Underdomænet dev-miljøet lever under. Preview-værter bliver api-pr-<n>.<dev_domain>."
+  description = "Underdomænet dev-miljøet lever under, fx dev.maanslogen.dk."
+  type        = string
+  default     = null
+}
+
+variable "staging_domain" {
+  description = "Underdomænet staging lever under, fx staging.maanslogen.dk."
   type        = string
   default     = null
 }
 
 locals {
-  dev_domain = coalesce(var.dev_domain, "dev.${var.domain}")
+  dev_domain     = coalesce(var.dev_domain, "dev.${var.domain}")
+  staging_domain = coalesce(var.staging_domain, "staging.${var.domain}")
 }

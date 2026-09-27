@@ -17,6 +17,12 @@
 #      skriveadgang til repoet.
 #   3. Grenen ligger i repoet selv, ikke i en fork. Tjekkes igen her.
 #
+# Tre trin, tre tags i GHCR:
+#
+#   :prod    produktionen — flyttes kun af et release i GitHub
+#   :main    staging — lægges op ved hvert push til main
+#   :dev     dev — lægges op af det PR der har label'en "dev"
+#
 # Der er ÉT dev-miljø, ikke ét pr. PR. Agenten spørger kun om noget åbent PR
 # i repoet bærer label'en; hvilket ét er workflowets sag, for det er det der
 # lægger `:dev` op, og den seneste kørsel vinder. Har ingen PR'er label'en,
@@ -114,13 +120,27 @@ opdater_tjeneste() {
 
 # ---- Kør ----------------------------------------------------------------
 main() {
-  # Produktionen følger altid :main.
+  # :main er staging — og dev'ens standard, når intet PR har label'en.
   docker pull -q "${GHCR_IMAGE}:main" >/dev/null
   local hovedimage
   hovedimage=$(docker inspect --format '{{.Id}}' "${GHCR_IMAGE}:main")
 
-  opdater_tjeneste api maanslogen maanslogen \
-    "$POSTGRES_USER" "$POSTGRES_PASSWORD" main "$hovedimage"
+  # Produktionen følger :prod, og det tag flyttes kun af et release i GitHub.
+  # Findes det ikke endnu, bliver produktionen stående på det den kører: at
+  # falde tilbage til :main ville omgå netop den port et release er.
+  if docker pull -q "${GHCR_IMAGE}:prod" >/dev/null 2>&1; then
+    local prodimage
+    prodimage=$(docker inspect --format '{{.Id}}' "${GHCR_IMAGE}:prod")
+    opdater_tjeneste api maanslogen maanslogen \
+      "$POSTGRES_USER" "$POSTGRES_PASSWORD" prod "$prodimage"
+  else
+    log "prod: intet :prod-image (intet release endnu) — produktionen står urørt"
+  fi
+
+  # Staging kører main-grenen. Den migreres før dev, så en migrering der kun
+  # findes i et PR bliver den sidste der lægges oven på den fælles database.
+  opdater_tjeneste api-staging maanslogen-dev maanslogen_dev \
+    maanslogen_dev "$DEV_POSTGRES_PASSWORD" main "$hovedimage"
 
   # Dev følger :dev så snart et åbent PR har label'en — ellers :main, så
   # miljøet aldrig står tilbage med kode fra et PR ingen længere peger på.

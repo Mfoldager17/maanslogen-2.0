@@ -1,7 +1,13 @@
-name: Udrul
+name: Staging
 
+# Push til main bliver til staging — ikke til produktion.
+#
+# Produktionen flyttes af `release.yml`, når du laver et release i GitHub.
+# Den bygger ikke noget nyt: den forfremmer præcis det image der allerede har
+# stået på staging. Derfor kan der kun udrulles kode der har været på main.
+#
 # Lægger et nyt :main-image i GHCR. Pi'en opdager det selv inden for et par
-# minutter, migrerer og genstarter — se infra/pi/agent/.
+# minutter, migrerer og genstarter api-staging — se infra/pi/agent/.
 #
 # Der er ingen selvhostet runner. Intet her har adgang til Pi'en, og Pi'en har
 # ingen skriverettigheder nogen steder.
@@ -11,7 +17,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: deploy-produktion
+  group: udrul-staging
   cancel-in-progress: false
 
 permissions:
@@ -47,7 +53,7 @@ jobs:
           cache-to: type=gha,mode=max
 
   web:
-    name: Web på Workers
+    name: Web på Workers (staging)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -63,13 +69,19 @@ jobs:
       - name: Byg til Workers
         working-directory: apps/web
         env:
-          NEXT_PUBLIC_API_URL: https://${{ vars.PROD_API_HOST }}
-          NEXT_PUBLIC_MEDIA_URL: https://${{ vars.PROD_MEDIA_HOST }}
+          NEXT_PUBLIC_API_URL: https://${{ vars.STAGING_API_HOST }}
+          # Staging deler dev'ens billeder — se docs/environments.md.
+          NEXT_PUBLIC_MEDIA_URL: https://${{ vars.DEV_MEDIA_HOST }}
         run: pnpm cf:build
 
-      - name: Udrul
+      # `versions upload`, ikke `deploy`: den lægger en version op på sit eget
+      # faste alias uden at røre den der er udrullet i produktionen.
+      - name: Læg versionen op
         working-directory: apps/web
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: pnpm exec wrangler deploy
+        run: |
+          pnpm exec wrangler versions upload \
+            --preview-alias staging \
+            --message "staging ← ${{ github.sha }}"

@@ -1,0 +1,113 @@
+name: Produktion
+
+# Produktionen flyttes kun herfra, og kun når du laver et release i GitHub.
+# Et push til main går til staging (se staging-workflowet i deploy.yml).
+#
+# Workflowet **bygger ikke noget nyt**. Det forfremmer præcis det image der
+# allerede blev bygget for den commit — altså de bits der har stået på
+# staging. To ting følger af det:
+#
+#   · Du kan ikke udrulle kode der ikke har været på main. Findes der intet
+#     image for release'ets commit, stopper det her med en forklaring frem
+#     for at bygge noget nyt og kalde det "det samme".
+#   · Produktionen får nøjagtig det der blev prøvet af, ikke en ny oversættelse
+#     af den samme kildekode.
+#
+# Der er ingen selvhostet runner. Intet her har adgang til Pi'en.
+on:
+  release:
+    types: [published]
+
+concurrency:
+  group: udrul-produktion
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  image:
+    name: Forfrem imaget til :prod
+    # Et pre-release er en prøveballon, ikke en udrulning.
+    if: '!github.event.release.prerelease'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/setup-buildx-action@v3
+
+      # `imagetools create` skriver et nyt tag på det image der allerede
+      # ligger — uden at hente eller bygge noget. Findes kilden ikke, fejler
+      # den, og det er netop porten: så har commit'en aldrig været på main.
+      - name: Forfrem
+        env:
+          BILLEDE: ghcr.io/${{ github.repository_owner }}/maanslogen-api
+          SHA: ${{ github.event.release.target_commitish }}
+          MAERKAT: ${{ github.event.release.tag_name }}
+        run: |
+          set -euo pipefail
+
+          # target_commitish kan være et grennavn, hvis release'et blev lavet
+          # ud fra en gren frem for en tag'et commit. Så er det commit'en bag
+          # tag'et vi vil have — den kender GitHub, og `git ls-remote` er nok.
+          if [ ${#SHA} -ne 40 ]; then
+            SHA=$(git ls-remote "https://github.com/${GITHUB_REPOSITORY}" \
+              "refs/tags/${MAERKAT}^{}" | cut -f1)
+            [ -n "$SHA" ] || SHA=$(git ls-remote "https://github.com/${GITHUB_REPOSITORY}" \
+              "refs/tags/${MAERKAT}" | cut -f1)
+          fi
+          [ -n "$SHA" ] || { echo "Kunne ikke finde commit'en bag ${MAERKAT}."; exit 1; }
+          echo "Forfremmer ${BILLEDE}:${SHA}"
+
+          if ! docker buildx imagetools inspect "${BILLEDE}:${SHA}" >/dev/null 2>&1; then
+            echo
+            echo "Der findes intet image for ${SHA}."
+            echo "Kun commits der har været på main bliver bygget, og kun dem"
+            echo "kan udrulles. Er release'et lavet ud fra en gren der aldrig"
+            echo "blev merget, er det forklaringen."
+            exit 1
+          fi
+
+          docker buildx imagetools create \
+            --tag "${BILLEDE}:prod" \
+            --tag "${BILLEDE}:${MAERKAT}" \
+            "${BILLEDE}:${SHA}"
+
+  web:
+    name: Web på Workers (produktion)
+    if: '!github.event.release.prerelease'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Kildekoden fra release'ets tag, ikke fra main. Ellers kunne et
+          # release af en ældre version udrulle nyere web-kode.
+          ref: ${{ github.event.release.tag_name }}
+
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @maanslogen/contracts build
+
+      - name: Byg til Workers
+        working-directory: apps/web
+        env:
+          NEXT_PUBLIC_API_URL: https://${{ vars.PROD_API_HOST }}
+          NEXT_PUBLIC_MEDIA_URL: https://${{ vars.PROD_MEDIA_HOST }}
+        run: pnpm cf:build
+
+      - name: Udrul
+        working-directory: apps/web
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: pnpm exec wrangler deploy

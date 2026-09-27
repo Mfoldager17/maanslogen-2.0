@@ -1,11 +1,25 @@
 # Miljøer
 
-To miljøer. **Produktion** kører altid. **Dev** er ét fælles miljø: det følger
-`main`, indtil et PR gør krav på det med label'en `dev`.
+Tre trin, og de flyttes af hver sin ting:
 
-Der er altså ikke et miljø pr. PR. Har tre PR'er label'en, får det seneste der
-blev bygget miljøet — de andre venter ikke i kø, de bliver bare overtaget.
-Koden til ét preview pr. PR ligger parkeret i
+| Trin           | Flyttes af              | Image   |
+| -------------- | ----------------------- | ------- |
+| **Dev**        | Label'en `dev` på et PR | `:dev`  |
+| **Staging**    | Push til `main`         | `:main` |
+| **Produktion** | Et **release** i GitHub | `:prod` |
+
+Et push til main går altså ikke længere i produktion. Det går til staging, og
+produktionen flytter sig først når du laver et release — og kun til kode der
+allerede har stået på staging: release-workflowet bygger ikke noget nyt, det
+forfremmer det image der blev bygget for den commit.
+
+Dev og staging deler database og billedbucket. Det er et bevidst valg:
+staging findes for at køre main et rigtigt sted før et release, ikke for at
+have sit eget datasæt.
+
+Der er ét dev-miljø, ikke ét pr. PR. Har tre PR'er label'en, får det seneste
+der blev bygget miljøet — de andre venter ikke i kø, de bliver bare
+overtaget. Koden til ét preview pr. PR ligger parkeret i
 [`preview.yml.parkeret`](../.github/workflows/preview.yml.parkeret) og nederst
 i agenten, så den kan tages op igen.
 
@@ -16,13 +30,14 @@ ubuntu-24.04-arm                Workers (web)          Postgres
   bygger arm64-image              maanslogen.dk          · maanslogen
        │                               │                  · maanslogen_dev
        ▼                               │ fetch
-     GHCR                              ▼                 api        (prod)
-  · :main                         Tunnel ─► Caddy ─►     api-dev    (dev)
-  · :dev                                                       ▲
+     GHCR                              ▼                 api         (:prod)
+  · :prod  ← release              Tunnel ─► Caddy ─►     api-staging (:main)
+  · :main  ← push til main                               api-dev     (:dev)
+  · :dev   ← label på et PR                                    ▲
        │                                                       │
        │   GitHub ringer på, og agenten spørger:               │
        │     · har et åbent PR label'en "dev"?                 │
-       │     · er der et nyt :main- eller :dev-image?          │
+       │     · er der nye :prod-, :main- eller :dev-images?    │
        └───────────────────────────────────────────►  maanslogen-agent
 ```
 
@@ -32,14 +47,14 @@ ikke beskeden, den spørger GitHub selv og udfører kun `docker pull` og
 `docker run` med argumenter, den selv bestemmer ud fra kode der ligger på
 `main`. Se [`infra/pi/agent/`](../infra/pi/agent/).
 
-|          | Produktion              | Dev                                          |
-| -------- | ----------------------- | -------------------------------------------- |
-| Web      | Worker `maanslogen-web` | Worker-**version** på det faste alias `dev`  |
-| API      | Container på Pi'en      | Én container, `api-dev`                      |
-| Database | `maanslogen`            | `maanslogen_dev` — **én, fælles**            |
-| Billeder | `maanslogen-media`      | `maanslogen-media-dev`                       |
-| Følger   | `main`                  | Seneste PR med label'en `dev`, ellers `main` |
-| Lever    | Altid                   | Altid — skifter bare hvad den viser          |
+|          | Produktion              | Staging                | Dev                                  |
+| -------- | ----------------------- | ---------------------- | ------------------------------------ |
+| Web      | Worker `maanslogen-web` | Alias `staging`        | Alias `dev`                          |
+| API      | `api`                   | `api-staging`          | `api-dev`                            |
+| Database | `maanslogen`            | `maanslogen_dev`       | `maanslogen_dev` — **delt**          |
+| Billeder | `maanslogen-media`      | `maanslogen-media-dev` | `maanslogen-media-dev`               |
+| Følger   | Seneste release         | `main`                 | PR med label'en `dev`, ellers `main` |
+| Lever    | Altid                   | Altid                  | Altid — skifter hvad den viser       |
 
 ---
 
@@ -133,7 +148,7 @@ privat som udgangspunkt**, og Pi'en har med vilje ingen credentials — så
 `docker pull` ville svare `denied`, og agenten ville vente i det uendelige på
 et image den ikke må se.
 
-Efter første vellykkede kørsel af _Udrul_: gå til repoets forside →
+Efter første vellykkede kørsel af _Staging_: gå til repoets forside →
 **Packages** → `maanslogen-api` → _Package settings_ → **Change visibility** →
 _Public_.
 
@@ -307,9 +322,9 @@ I GitHub: _Settings → Webhooks → Add webhook_
 | Secret       | den samme streng som `WEBHOOK_SECRET`                     |
 | Events       | _Let me select individual events_ → kun **Workflow runs** |
 
-`workflow_run` er nok til det hele. Den fyrer når `Udrul` er færdig med at
-lægge et `:main`-image op, og når `Dev` er færdig med et `:dev`. Én
-hændelsestype dækker både udrulning og skift af dev-miljøet.
+`workflow_run` er nok til det hele. Den fyrer når `Staging` er færdig med et
+`:main`-image, når `Dev` er færdig med et `:dev`, og når `Produktion` har
+forfremmet et `:prod`. Én hændelsestype dækker alle tre trin.
 
 > **Hvorfor det er forsvarligt at have en endpoint ind mod hjemmet.**
 > Beskeden er kun en dørklokke. Modtageren læser ikke indholdet, den vækker
@@ -341,14 +356,18 @@ Secrets:
 
 Variables:
 
-| Navn                | Eksempel                  |
-| ------------------- | ------------------------- |
-| `WORKER_NAME`       | `maanslogen-web`          |
-| `WORKERS_SUBDOMAIN` | `dit-navn.workers.dev`    |
-| `DEV_DOMAIN`        | `dev.maanslogen.dk`       |
-| `PROD_API_HOST`     | `api.maanslogen.dk`       |
-| `PROD_MEDIA_HOST`   | `media.maanslogen.dk`     |
-| `DEV_MEDIA_HOST`    | `media.dev.maanslogen.dk` |
+| Navn                | Eksempel                    |
+| ------------------- | --------------------------- |
+| `WORKER_NAME`       | `maanslogen-web`            |
+| `WORKERS_SUBDOMAIN` | `dit-navn.workers.dev`      |
+| `DEV_DOMAIN`        | `dev.maanslogen.dk`         |
+| `PROD_API_HOST`     | `api.maanslogen.dk`         |
+| `STAGING_API_HOST`  | `api.staging.maanslogen.dk` |
+| `PROD_MEDIA_HOST`   | `media.maanslogen.dk`       |
+| `DEV_MEDIA_HOST`    | `media.dev.maanslogen.dk`   |
+
+`STAGING_API_HOST` bruges af staging-workflowet; billederne henter staging fra
+`DEV_MEDIA_HOST`, fordi den deler bucket med dev.
 
 ### 7. Første udrulning
 
@@ -371,6 +390,32 @@ journalctl -u maanslogen-agent -n 20   # "api: opdateret" eller ingen ændring
 curl -s https://api.maanslogen.dk/api/v1/health/ready
 curl -s https://maanslogen.dk -o /dev/null -w '%{http_code}\n'
 ```
+
+---
+
+## Fra main til produktion
+
+1. Du merger et PR. `Staging` bygger `:main` og `:<sha>`, og lægger web op på
+   aliaset `staging`. Agenten genstarter `api-staging`.
+2. Du prøver det af på staging-adresserne. Produktionen er urørt.
+3. Du laver et **release** i GitHub på den commit. `Produktion` forfremmer
+   `:<sha>` til `:prod` og `:<tag>` — uden at bygge noget nyt — og udruller
+   web'en med `wrangler deploy`.
+4. Agenten ser det nye `:prod`, migrerer produktionsdatabasen og genstarter
+   `api`.
+
+**Forfremmelsen er porten.** Release-workflowet bygger ikke fra kildekode; det
+sætter et nyt tag på det image der allerede ligger. Findes der ikke et image
+for release'ets commit, stopper det med en forklaring. Du kan altså ikke
+udrulle kode der aldrig har været på main og igennem staging — ikke fordi en
+regel forbyder det, men fordi der ikke er noget at forfremme.
+
+Et **pre-release** springes over. Det er en prøveballon, ikke en udrulning.
+
+> **Første gang.** `:prod` findes ikke, før du har lavet det første release.
+> Indtil da lader agenten produktionen stå på det den allerede kører og
+> skriver `prod: intet :prod-image (intet release endnu)` i loggen. Den
+> falder med vilje ikke tilbage til `:main` — det ville omgå hele pointen.
 
 ---
 
@@ -516,8 +561,10 @@ Gøres repoet privat, tæller de GitHub-hostede jobs med i den månedlige pulje
 | -------------------------- | ------------------ | ------ |
 | CI · typecheck, lint, test | `ubuntu-latest`    | ~2 min |
 | CI · Docker-images         | `ubuntu-latest`    | ~4 min |
-| Udrul/Dev · API-image      | `ubuntu-24.04-arm` | ~4 min |
-| Udrul/Dev · web            | `ubuntu-latest`    | ~4 min |
+| Staging/Dev · API-image    | `ubuntu-24.04-arm` | ~4 min |
+| Staging/Dev · web          | `ubuntu-latest`    | ~4 min |
+| Produktion · forfremmelse  | `ubuntu-latest`    | <1 min |
+| Produktion · web           | `ubuntu-latest`    | ~4 min |
 | Kommentar                  | `ubuntu-latest`    | <1 min |
 | Agent og nulstilling af db | Pi'en, ingen CI    | gratis |
 

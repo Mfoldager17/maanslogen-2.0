@@ -17,7 +17,13 @@
 		reverse_proxy api:4000
 	}
 
-	# Det delte dev-API (main-grenens kode mod dev-databasen).
+	# Staging: main-grenens kode mod dev-databasen.
+	@staging host {$STAGING_API_HOST}
+	handle @staging {
+		reverse_proxy api-staging:4000
+	}
+
+	# Dev: koden fra det PR der har label'en "dev" — ellers main.
 	@dev host {$DEV_API_HOST}
 	handle @dev {
 		reverse_proxy api-dev:4000

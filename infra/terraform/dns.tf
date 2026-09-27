@@ -31,6 +31,16 @@ resource "cloudflare_dns_record" "api_dev" {
   comment = "Terraform — delt dev-API"
 }
 
+resource "cloudflare_dns_record" "api_staging" {
+  zone_id = var.zone_id
+  name    = "api.${local.staging_domain}"
+  type    = "CNAME"
+  content = local.tunnel_target
+  proxied = true
+  ttl     = 1
+  comment = "Terraform — staging-API (main-grenen)"
+}
+
 # Billeddomænerne foran R2. De skal knyttes til bucketen under
 # Settings → Public access → Custom domains, hvilket provideren ikke kan;
 # recorden her findes for at domænet er reserveret og dokumenteret.
