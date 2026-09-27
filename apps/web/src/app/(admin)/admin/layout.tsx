@@ -5,6 +5,7 @@ import { AdminNav } from "@/components/admin/admin-nav";
 import { Logo } from "@/components/layout/logo";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
 import { Badge } from "@/components/ui/badge";
+import { ROLLE_ETIKETTER } from "@/lib/roller";
 
 /**
  * Adgangen håndhæves af API'et; dette lag sørger blot for at ingen bruger
@@ -32,7 +33,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         <div className="mt-auto flex items-center gap-2 rounded-[var(--radius-control)] bg-sunken p-2.5">
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-semibold">{user.displayName}</p>
-            <p className="truncate text-xs text-ink-muted">{user.role}</p>
+            <p className="truncate text-xs text-ink-muted">{ROLLE_ETIKETTER[user.role]}</p>
           </div>
           <ThemeToggle />
         </div>
