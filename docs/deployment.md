@@ -125,23 +125,70 @@ docker build -f apps/web/Dockerfile \
 
 ## Cookies på tværs af værter
 
-`COOKIE_DOMAIN` udelades normalt, og det er med vilje.
+`COOKIE_DOMAIN` **skal** sættes når sitet og API'et bor på hver sit værtsnavn.
 
-Refresh-cookien sættes af API'et og læses kun af API'et. Uden `COOKIE_DOMAIN`
-bliver den _host-only_: bundet til `api-maanslogen.mathiasfoldager.com` og
-sendt ingen andre steder hen. Det er alt hvad der skal til, fordi browseren
-sender den med på de kald sitet laver til API'et — i produktion sættes
-cookien automatisk med `Secure` og `SameSite=None`, som netop tillader det på
-tværs af værter. Det kræver HTTPS begge steder.
+Her stod før at cookien "sættes af API'et og læses kun af API'et", og at
+host-only derfor var nok. Den præmis er forkert, og det er værd at forstå
+hvorfor, for fejlen den fører til ligner ikke en fejl.
 
-`COOKIE_DOMAIN` giver kun mening hvis cookien skal deles med _andre_ værter,
-og så skal den sættes til en forælder de deler. Her ville det være hele
-`mathiasfoldager.com`, og så fulgte refresh-tokenet med til alt andet på det
-domæne. Derfor ikke.
+Sitet læser cookien selv, på serversiden, før en side overhovedet renderes:
 
-Den dag API og site ligger under samme projekt-domæne — `api.maanslogen.com`
-og `maanslogen.com` — kan `COOKIE_DOMAIN=.maanslogen.com` sættes, hvis der
-opstår et behov for at dele.
+|                                  |                                                      |
+| -------------------------------- | ---------------------------------------------------- |
+| `apps/web/src/lib/api/server.ts` | henter `cookies()` og sender dem med til API'et      |
+| `apps/web/src/middleware.ts`     | læser access-tokenet for at afgøre om ruten må vises |
+
+Begge læser cookies fra **sitets** forespørgsel. En host-only cookie på
+`api-maanslogen.mathiasfoldager.com` er ikke med i en forespørgsel til
+`maanslogen.mathiasfoldager.com`, så sitet ser den aldrig. Man logger ind,
+browseren har sessionen, og sitets server mener stadig man er logget ud —
+`/admin` sender til login, og login-siden mener også man er logget ud. En
+løkke.
+
+Det ses ikke lokalt. Cookies skelner ikke på portnummer, så `localhost:3000`
+og `localhost:4000` er samme vært, og sedlen rækkes over alligevel. Først med
+rigtige, forskellige navne falder det fra hinanden.
+
+### Prisen, og hvad der begrænser den
+
+`COOKIE_DOMAIN=mathiasfoldager.com` betyder at cookien når alle underdomæner
+under navnet. Det er en reel omkostning ved at ligge på et personligt domæne
+frem for et projektdomæne.
+
+Den er afvejet mod at refresh-tokens **roteres ved brug** og hænger i
+familier (`auth.service.ts`): bruges et token der allerede er roteret,
+spærres hele familien. Et lækket refresh-token spærrer altså sig selv første
+gang det bruges ved siden af det rigtige.
+
+Den dag `maanslogen.com` er købt, bliver det `COOKIE_DOMAIN=maanslogen.com`,
+og så er hele domænet projektets eget.
+
+### API'et nægter at starte hvis de ikke passer sammen
+
+Ligger et site i `CORS_ORIGINS` uden for `COOKIE_DOMAIN`, kan det site ikke
+læse sessionen. Det tjekkes ved opstart (`config/env.ts`) frem for at vise
+sig som en login-løkke i drift:
+
+```
+COOKIE_DOMAIN: https://maanslogen-web.<navn>.workers.dev ligger uden for
+COOKIE_DOMAIN=mathiasfoldager.com. Sitet ville aldrig modtage
+sessionscookien og ville sende brugeren til login i en løkke.
+```
+
+**Derfor skal custom domain være knyttet til Workeren før prod tages i brug.**
+
+### Dev og staging har ingen session på serversiden
+
+`DEV_COOKIE_DOMAIN` og `STAGING_COOKIE_DOMAIN` står tomme, og det er ikke en
+forglemmelse. De to sites ligger på `workers.dev` som preview-aliasser af den
+samme Worker, og en cookie for `mathiasfoldager.com` når aldrig derhen.
+
+Følgen: i dev og staging virker indlogget indhold i browseren, men sitets egen
+server kender dig ikke. Det samme gælder hvis man kører web lokalt mod
+dev-API'et (`apps/web/.env.dev.example`) — `localhost` kan ikke ligge under
+domænet.
+
+Det løses den dag de to får navne under domænet; så udfyldes variablerne.
 
 ---
 

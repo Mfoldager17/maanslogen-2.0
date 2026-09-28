@@ -33,8 +33,21 @@ const envSchema = z
           .filter(Boolean),
       ),
     /**
-     * Udelades normalt — så bliver cookien host-only på API'ets eget
-     * værtsnavn. Se docs/deployment.md.
+     * Det fælles navn ovenover sitet og API'et, fx `mathiasfoldager.com`.
+     *
+     * Den SKAL sættes når de to bor på hver sit værtsnavn. Uden den bliver
+     * cookien host-only på API'ets vært, og så ser sitets server den aldrig:
+     * `api/server.ts` og `middleware.ts` læser `cookies()` fra *sitets*
+     * forespørgsel, ikke API'ets. Resultatet er at man logger ind og stadig
+     * regnes for logget ud — en løkke mellem login og den beskyttede side.
+     *
+     * Det ses ikke lokalt, fordi cookies ikke skelner på portnummer:
+     * localhost:3000 og localhost:4000 er samme vært. Derfor er den udeladt
+     * her, hvor der ikke er noget fælles navn at pege på.
+     *
+     * Prisen er at cookien når alle underdomæner under navnet. Den er
+     * afvejet mod at refresh-tokens roteres ved brug med familie-spærring
+     * (auth.service.ts), så et lækket token spærrer sig selv ved genbrug.
      *
      * Tom streng tælles som fraværende: docker compose indsætter `""` for en
      * variabel der ikke står i env-filen, og den skulle nødig ende som et
@@ -128,6 +141,43 @@ const envSchema = z
           path: ['CORS_ORIGINS'],
           message: 'CORS_ORIGINS skal sættes eksplicit i produktion',
         });
+      }
+    }
+
+    /**
+     * En cookie for `mathiasfoldager.com` når aldrig et site på
+     * `maanslogen-web.workers.dev`. Er der et site i CORS-listen som ligger
+     * uden for cookiens domæne, kan det site ikke læse sessionen — og fejlen
+     * viser sig ikke som en fejl, men som en bruger der bliver ved med at
+     * blive sendt til login.
+     *
+     * Derfor her, ved opstart, frem for i drift.
+     */
+    if (env.COOKIE_DOMAIN) {
+      const domaene = env.COOKIE_DOMAIN.replace(/^\./, '');
+      for (const origin of env.CORS_ORIGINS) {
+        let vaert: string;
+        try {
+          vaert = new URL(origin).hostname;
+        } catch {
+          ctx.addIssue({
+            code: 'custom',
+            path: ['CORS_ORIGINS'],
+            message: `"${origin}" er ikke en gyldig adresse`,
+          });
+          continue;
+        }
+
+        if (vaert !== domaene && !vaert.endsWith(`.${domaene}`)) {
+          ctx.addIssue({
+            code: 'custom',
+            path: ['COOKIE_DOMAIN'],
+            message:
+              `${origin} ligger uden for COOKIE_DOMAIN=${env.COOKIE_DOMAIN}. ` +
+              'Sitet ville aldrig modtage sessionscookien og ville sende brugeren ' +
+              'til login i en løkke. Flyt sitet ind under domænet, eller ryd COOKIE_DOMAIN.',
+          });
+        }
       }
     }
   });

@@ -114,8 +114,13 @@ Cloudflares gratis universalcertifikat dækker `*.mathiasfoldager.com`, men
 ville derfor stå uden certifikat og kun kunne nås gennem et betalt Advanced
 Certificate. Ét niveau under zonen, altid.
 
-Det er også derfor `COOKIE_DOMAIN` ikke sættes: se
-[`deployment.md`](deployment.md#cookies-på-tværs-af-værter).
+Det har også en følge for sessionen: fordi navnene er flade, er nærmeste
+fælles forælder for sitet og API'et hele `mathiasfoldager.com`, og det er
+derfor `COOKIE_DOMAIN` skal sættes til. Uden den ser sitets server aldrig
+sessionen. Se
+[`deployment.md`](deployment.md#cookies-på-tværs-af-værter) — herunder hvorfor
+prod kræver at custom domain er knyttet på først, og hvorfor dev og staging
+ikke har en session på serversiden.
 
 De fem navne Terraform opretter — API'erne og billeddomænerne — bygges ét
 sted, i `local.vaert` i
