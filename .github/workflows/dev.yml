@@ -55,6 +55,15 @@ jobs:
 
       # Ét fast tag. Agenten på Pi'en ser kun `:dev` og behøver ikke vide
       # hvilket PR der lagde det op.
+      # GHCR kræver små bogstaver i repository-navnet, og
+      # `github.repository_owner` er brugernavnet som det er skrevet —
+      # "Mfoldager17" med stort M. Uden det her afviser buildx med
+      # `invalid tag ...: repository name must be lowercase`, og det sker
+      # på ét sekund, før noget som helst er bygget.
+      - name: Imagenavnet med små bogstaver
+        id: billede
+        run: echo "navn=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/maanslogen-api" >> "$GITHUB_OUTPUT"
+
       - name: Byg og læg op
         uses: docker/build-push-action@v6
         with:
@@ -62,7 +71,7 @@ jobs:
           file: apps/api/Dockerfile
           push: true
           platforms: linux/arm64
-          tags: ghcr.io/${{ github.repository_owner }}/maanslogen-api:dev
+          tags: ${{ steps.billede.outputs.navn }}:dev
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
