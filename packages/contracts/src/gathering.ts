@@ -75,6 +75,31 @@ export const gatheringItemSchema = z
 
 export type GatheringItem = z.infer<typeof gatheringItemSchema>;
 
+/**
+ * Et billede fra aftenen.
+ *
+ * `url` er **signeret og kortlivet**, og den dannes ved hvert svar. Den
+ * gemmes ikke i databasen, for så ville en URL kunne læses ud af ét svar og
+ * bruges bagefter af enhver der havde den. Arrangementer er logens eget rum,
+ * og billederne ligger derfor i en privat bucket.
+ */
+export const gatheringPhotoSchema = z
+  .object({
+    id: idSchema,
+    itemId: idSchema.nullable(),
+    caption: z.string().nullable(),
+    sortOrder: z.number().int(),
+    uploadedById: idSchema,
+    uploadedByName: z.string(),
+    createdAt: isoDateTimeSchema,
+    url: z.string(),
+    /** Hvornår `url` holder op med at virke. Fladen kan hente siden igen. */
+    urlExpiresAt: isoDateTimeSchema,
+  })
+  .meta({ id: 'GatheringPhoto' });
+
+export type GatheringPhoto = z.infer<typeof gatheringPhotoSchema>;
+
 export const gatheringHostSchema = z.object({
   id: idSchema,
   displayName: z.string(),
@@ -109,6 +134,7 @@ export const gatheringDetailSchema = gatheringSchema
     story: z.string().nullable(),
     items: z.array(gatheringItemSchema),
     attendees: z.array(gatheringAttendeeSchema),
+    photos: z.array(gatheringPhotoSchema),
     /** Hvad den kaldende bruger må her og nu — så fladen slipper for at gætte. */
     viewer: z.object({
       isHost: z.boolean(),
@@ -116,6 +142,7 @@ export const gatheringDetailSchema = gatheringSchema
       attendeeId: idSchema.nullable(),
       canAddItems: z.boolean(),
       canWriteNotes: z.boolean(),
+      canAddPhotos: z.boolean(),
     }),
   })
   .meta({ id: 'GatheringDetail' });
@@ -187,6 +214,51 @@ export const upsertGatheringNoteSchema = z
   .meta({ id: 'UpsertGatheringNote' });
 
 export type UpsertGatheringNoteInput = z.infer<typeof upsertGatheringNoteSchema>;
+
+/**
+ * Upload sker i to trin: bed om en signeret PUT, læg filen op direkte i
+ * objektlageret, og fortæl så API'et at den ligger der. Filen går aldrig
+ * gennem API'et — det er den samme fremgangsmåde som katalogets billeder.
+ */
+export const presignGatheringPhotoSchema = z
+  .object({
+    contentType: z.enum(['image/jpeg', 'image/png', 'image/webp', 'image/avif']),
+  })
+  .meta({ id: 'PresignGatheringPhoto' });
+
+export type PresignGatheringPhotoInput = z.infer<typeof presignGatheringPhotoSchema>;
+
+export const gatheringPhotoUploadSchema = z
+  .object({
+    uploadUrl: z.string(),
+    storageKey: z.string(),
+    headers: z.record(z.string(), z.string()),
+    expiresAt: isoDateTimeSchema,
+  })
+  .meta({ id: 'GatheringPhotoUpload' });
+
+export type GatheringPhotoUpload = z.infer<typeof gatheringPhotoUploadSchema>;
+
+export const attachGatheringPhotoSchema = z
+  .object({
+    /** Nøglen fra presign-svaret. Klienten kan ikke vælge sin egen. */
+    storageKey: z.string().min(1),
+    itemId: idSchema.optional(),
+    caption: z.string().trim().max(280).optional(),
+  })
+  .meta({ id: 'AttachGatheringPhoto' });
+
+export type AttachGatheringPhotoInput = z.infer<typeof attachGatheringPhotoSchema>;
+
+export const updateGatheringPhotoSchema = z
+  .object({
+    itemId: idSchema.nullish(),
+    caption: z.string().trim().max(280).nullish(),
+    sortOrder: z.number().int().min(0).optional(),
+  })
+  .meta({ id: 'UpdateGatheringPhoto' });
+
+export type UpdateGatheringPhotoInput = z.infer<typeof updateGatheringPhotoSchema>;
 
 export const inviteAttendeeSchema = z.object({ userId: idSchema }).meta({ id: 'InviteAttendee' });
 

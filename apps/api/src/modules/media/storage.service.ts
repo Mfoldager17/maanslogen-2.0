@@ -1,5 +1,10 @@
 import { Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import { DeleteObjectsCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import {
+  DeleteObjectsCommand,
+  GetObjectCommand,
+  PutObjectCommand,
+  S3Client,
+} from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { IMMUTABLE_CACHE_CONTROL } from '@maanslogen/contracts';
 import { CONFIG, type AppConfig } from '../../config/env';
@@ -11,6 +16,19 @@ export interface PresignedPut {
   publicUrl: string;
   /** Headers klienten skal sende. De indgår i signaturen. */
   headers: Record<string, string>;
+  expiresAt: Date;
+}
+
+/** Som `PresignedPut`, men uden `publicUrl`: der findes ingen offentlig URL. */
+export interface PresignedPrivatePut {
+  uploadUrl: string;
+  storageKey: string;
+  headers: Record<string, string>;
+  expiresAt: Date;
+}
+
+export interface SignedRead {
+  url: string;
   expiresAt: Date;
 }
 
@@ -28,10 +46,18 @@ export class StorageService implements OnModuleInit {
   private readonly client: S3Client;
   private readonly bucket: string;
   private readonly publicBaseUrl: string;
+  /**
+   * Den private bucket deler klient og nøgler med den offentlige — samme
+   * konto, samme endpoint. Det er kun *bucketen* der er en anden, og det er
+   * netop dér forskellen ligger: den har intet domæne foran og ingen
+   * læsepolitik, så ingen kan nå den uden en signatur.
+   */
+  private readonly privateBucket: string;
 
   constructor(@Inject(CONFIG) private readonly config: AppConfig) {
     if (config.STORAGE_DRIVER === 'r2') {
       this.bucket = config.R2_BUCKET as string;
+      this.privateBucket = config.R2_PRIVATE_BUCKET as string;
       this.publicBaseUrl = (config.R2_PUBLIC_BASE_URL as string).replace(/\/+$/, '');
       // `WHEN_REQUIRED`, ikke standardens `WHEN_SUPPORTED`: fra og med
       // @aws-sdk/client-s3 3.729 lægger SDK'et selv en CRC32-sum på enhver
@@ -52,6 +78,7 @@ export class StorageService implements OnModuleInit {
       });
     } else {
       this.bucket = config.S3_BUCKET as string;
+      this.privateBucket = config.S3_PRIVATE_BUCKET as string;
       const endpoint = (config.S3_ENDPOINT as string).replace(/\/+$/, '');
       this.publicBaseUrl = (config.S3_PUBLIC_BASE_URL ?? `${endpoint}/${this.bucket}`).replace(
         /\/+$/,
@@ -74,7 +101,7 @@ export class StorageService implements OnModuleInit {
   onModuleInit(): void {
     setMediaPublicBaseUrl(this.publicBaseUrl);
     this.logger.log(
-      `Objektlager: ${this.config.STORAGE_DRIVER} · bucket "${this.bucket}" · offentlig base ${this.publicBaseUrl}`,
+      `Objektlager: ${this.config.STORAGE_DRIVER} · bucket "${this.bucket}" · privat bucket "${this.privateBucket}" · offentlig base ${this.publicBaseUrl}`,
     );
   }
 
@@ -132,8 +159,64 @@ export class StorageService implements OnModuleInit {
     };
   }
 
+  /**
+   * Presigner en PUT til den private bucket.
+   *
+   * Uden `Cache-Control`: objektet skal ikke caches nogen steder. En signeret
+   * URL udløber, men en kopi i en mellemliggende cache gør ikke — og så ville
+   * udløbet ikke betyde noget.
+   */
+  async presignPrivatePut(storageKey: string, contentType: string): Promise<PresignedPrivatePut> {
+    const expiresIn = this.config.UPLOAD_URL_TTL_SECONDS;
+
+    const uploadUrl = await getSignedUrl(
+      this.client,
+      new PutObjectCommand({
+        Bucket: this.privateBucket,
+        Key: storageKey,
+        ContentType: contentType,
+      }),
+      { expiresIn },
+    );
+
+    return {
+      uploadUrl,
+      storageKey,
+      headers: { 'content-type': contentType },
+      expiresAt: new Date(Date.now() + expiresIn * 1_000),
+    };
+  }
+
+  /**
+   * Signerer en læsning af ét objekt i den private bucket.
+   *
+   * Udstedes først efter at kalderen har fået adgang — signaturen ER adgangen,
+   * så den må ikke dannes for et svar modtageren ikke måtte se. Kortlivet af
+   * samme grund: en delt URL skal holde op med at virke.
+   */
+  async presignPrivateGet(storageKey: string): Promise<SignedRead> {
+    const expiresIn = this.config.PRIVATE_URL_TTL_SECONDS;
+
+    const url = await getSignedUrl(
+      this.client,
+      new GetObjectCommand({ Bucket: this.privateBucket, Key: storageKey }),
+      { expiresIn },
+    );
+
+    return { url, expiresAt: new Date(Date.now() + expiresIn * 1_000) };
+  }
+
+  /** Som `deleteObjects`, men i den private bucket. */
+  async deletePrivateObjects(storageKeys: string[]): Promise<number> {
+    return this.deleteFrom(this.privateBucket, storageKeys);
+  }
+
   /** Sletter kun navngivne nøgler — aldrig præfikser eller buckets. */
   async deleteObjects(storageKeys: string[]): Promise<number> {
+    return this.deleteFrom(this.bucket, storageKeys);
+  }
+
+  private async deleteFrom(bucket: string, storageKeys: string[]): Promise<number> {
     if (storageKeys.length === 0) return 0;
     let deleted = 0;
     for (let index = 0; index < storageKeys.length; index += 1_000) {
@@ -141,7 +224,7 @@ export class StorageService implements OnModuleInit {
       try {
         const result = await this.client.send(
           new DeleteObjectsCommand({
-            Bucket: this.bucket,
+            Bucket: bucket,
             Delete: { Objects: batch.map((Key) => ({ Key })), Quiet: true },
           }),
         );

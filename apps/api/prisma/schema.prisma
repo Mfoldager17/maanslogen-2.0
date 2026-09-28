@@ -113,6 +113,7 @@ model User {
 
   hostedGatherings    Gathering[]
   gatheringAttendance GatheringAttendee[]
+  gatheringPhotos     GatheringPhoto[]
 
   @@index([role])
   @@index([deletedAt])
@@ -514,6 +515,7 @@ model Gathering {
   host      User                @relation(fields: [hostId], references: [id], onDelete: Restrict)
   items     GatheringItem[]
   attendees GatheringAttendee[]
+  photos    GatheringPhoto[]
 
   @@index([status, heldAt(sort: Desc)])
   @@index([hostId])
@@ -543,9 +545,10 @@ model GatheringItem {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  gathering Gathering       @relation(fields: [gatheringId], references: [id], onDelete: Cascade)
-  beverage  Beverage?       @relation(fields: [beverageId], references: [id], onDelete: SetNull)
+  gathering Gathering        @relation(fields: [gatheringId], references: [id], onDelete: Cascade)
+  beverage  Beverage?        @relation(fields: [beverageId], references: [id], onDelete: SetNull)
   notes     GatheringNote[]
+  photos    GatheringPhoto[]
 
   @@unique([gatheringId, sortOrder])
   @@index([gatheringId])
@@ -595,4 +598,41 @@ model GatheringNote {
   @@index([itemId])
   @@index([attendeeId])
   @@map("gathering_notes")
+}
+
+/// Billeder fra aftenen.
+///
+/// De ligger i en **anden bucket** end katalogets billeder, og det er ikke en
+/// detalje: mediebucketen har offentlig læsning, så alt i den kan hentes af
+/// enhver der kender nøglen. Arrangementer er logens eget rum, og et billede
+/// derfra må ikke kunne deles ved et uheld — derfor en privat bucket og
+/// kortlivede, signerede URL'er der først udstedes efter adgangstjekket.
+///
+/// Derfor gemmes kun nøglen her. Der findes ingen kolonne med en færdig URL,
+/// for så ville den kunne læses ud af et svar og bruges bagefter.
+model GatheringPhoto {
+  id          String  @id @default(uuid()) @db.Uuid
+  gatheringId String  @map("gathering_id") @db.Uuid
+  /// Hører billedet til én bestemt servering? Ellers er det bare fra aftenen.
+  itemId      String? @map("item_id") @db.Uuid
+
+  storageKey  String  @unique @map("storage_key")
+  contentType String  @map("content_type")
+  caption     String?
+  sortOrder   Int     @default(0) @map("sort_order")
+
+  /// Den der lagde det op må også fjerne det igen — det behøver ikke gå
+  /// gennem en admin.
+  uploadedById String @map("uploaded_by_id") @db.Uuid
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  gathering  Gathering      @relation(fields: [gatheringId], references: [id], onDelete: Cascade)
+  item       GatheringItem? @relation(fields: [itemId], references: [id], onDelete: SetNull)
+  uploadedBy User           @relation(fields: [uploadedById], references: [id], onDelete: Cascade)
+
+  @@index([gatheringId, sortOrder])
+  @@index([itemId])
+  @@index([uploadedById])
+  @@map("gathering_photos")
 }

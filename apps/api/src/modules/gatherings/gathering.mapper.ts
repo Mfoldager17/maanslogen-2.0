@@ -5,6 +5,7 @@ import type {
   GatheringDetail,
   GatheringItem,
   GatheringNote,
+  GatheringPhoto,
 } from '@maanslogen/contracts';
 import { publicUrlFor } from '../media/media.mapper';
 
@@ -50,6 +51,10 @@ export const gatheringDetailInclude = {
       },
     },
   },
+  photos: {
+    orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
+    include: { uploadedBy: { select: { displayName: true } } },
+  },
 } satisfies Prisma.GatheringInclude;
 
 type ListRow = Prisma.GatheringGetPayload<{ include: typeof gatheringListInclude }>;
@@ -57,6 +62,7 @@ type DetailRow = Prisma.GatheringGetPayload<{ include: typeof gatheringDetailInc
 type AttendeeRow = DetailRow['attendees'][number];
 type ItemRow = DetailRow['items'][number];
 type NoteRow = ItemRow['notes'][number];
+export type PhotoRow = DetailRow['photos'][number];
 
 type Rendition = { variant: string; storageKey: string };
 
@@ -141,18 +147,39 @@ export function toItem(row: ItemRow): GatheringItem {
   };
 }
 
+/**
+ * URL'en dannes ikke her. Den er signeret og kortlivet, og signeringen er et
+ * kald til objektlageret — så den skal laves af servicen, efter adgangen er
+ * afgjort. Ville mapperen danne den, kunne den komme til at ligge i et svar
+ * som modtageren ikke måtte se.
+ */
+export function toPhoto(row: PhotoRow, signed: { url: string; expiresAt: Date }): GatheringPhoto {
+  return {
+    id: row.id,
+    itemId: row.itemId,
+    caption: row.caption,
+    sortOrder: row.sortOrder,
+    uploadedById: row.uploadedById,
+    uploadedByName: row.uploadedBy.displayName,
+    createdAt: row.createdAt.toISOString(),
+    url: signed.url,
+    urlExpiresAt: signed.expiresAt.toISOString(),
+  };
+}
+
 export interface ViewerRights {
   isHost: boolean;
   isAdmin: boolean;
   attendeeId: string | null;
   canAddItems: boolean;
   canWriteNotes: boolean;
+  canAddPhotos: boolean;
 }
 
 export function toGatheringDetail(
   row: DetailRow,
   viewer: ViewerRights,
-  options: { includeStory: boolean },
+  options: { includeStory: boolean; photos: GatheringPhoto[] },
 ): GatheringDetail {
   return {
     ...toGathering(row),
@@ -161,6 +188,7 @@ export function toGatheringDetail(
     story: options.includeStory ? row.story : null,
     items: row.items.map(toItem),
     attendees: row.attendees.map(toAttendee),
+    photos: options.photos,
     viewer,
   };
 }

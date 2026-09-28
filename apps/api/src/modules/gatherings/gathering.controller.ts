@@ -12,22 +12,29 @@ import {
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   addGatheringItemSchema,
+  attachGatheringPhotoSchema,
   createGatheringSchema,
   gatheringDetailSchema,
   gatheringListQuerySchema,
+  gatheringPhotoUploadSchema,
   gatheringSchema,
   inviteAttendeeSchema,
   paginated,
+  presignGatheringPhotoSchema,
   updateGatheringItemSchema,
+  updateGatheringPhotoSchema,
   updateGatheringSchema,
   upsertGatheringNoteSchema,
   type AccessTokenClaims,
   type AddGatheringItemInput,
+  type AttachGatheringPhotoInput,
   type CreateGatheringInput,
   type GatheringListQuery,
   type InviteAttendeeInput,
+  type PresignGatheringPhotoInput,
   type UpdateGatheringInput,
   type UpdateGatheringItemInput,
+  type UpdateGatheringPhotoInput,
   type UpsertGatheringNoteInput,
 } from '@maanslogen/contracts';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -257,5 +264,66 @@ export class GatheringController {
     @CurrentUser() viewer: AccessTokenClaims,
   ) {
     return this.gatherings.removeNote(idOrSlug, itemId, viewer);
+  }
+
+  // ---- Billeder -----------------------------------------------------------
+
+  @Post(':idOrSlug/photos/presign')
+  @ApiOperation({
+    summary: 'Bed om en signeret upload',
+    description:
+      "Filen lægges op direkte i objektlageret og går aldrig gennem API'et. Nøglen dannes her, så klienten ikke kan vælge sin egen.",
+  })
+  @ApiZodBody(presignGatheringPhotoSchema)
+  @ApiZodResponse(HttpStatus.CREATED, gatheringPhotoUploadSchema)
+  @ApiProblemResponses(403, 404, 422)
+  presignPhoto(
+    @Param('idOrSlug') idOrSlug: string,
+    @ZodBody(presignGatheringPhotoSchema) input: PresignGatheringPhotoInput,
+    @CurrentUser() viewer: AccessTokenClaims,
+  ) {
+    return this.gatherings.presignPhoto(idOrSlug, input, viewer);
+  }
+
+  @Post(':idOrSlug/photos')
+  @ApiOperation({ summary: 'Knyt den uploadede fil til arrangementet' })
+  @ApiZodBody(attachGatheringPhotoSchema)
+  @ApiZodResponse(HttpStatus.CREATED, gatheringDetailSchema)
+  @ApiProblemResponses(400, 403, 404, 422)
+  attachPhoto(
+    @Param('idOrSlug') idOrSlug: string,
+    @ZodBody(attachGatheringPhotoSchema) input: AttachGatheringPhotoInput,
+    @CurrentUser() viewer: AccessTokenClaims,
+  ) {
+    return this.gatherings.attachPhoto(idOrSlug, input, viewer);
+  }
+
+  @Patch(':idOrSlug/photos/:photoId')
+  @ApiOperation({
+    summary: 'Ret billedtekst, rækkefølge eller hvilken post det hører til',
+    description: 'Den der lagde det op, eller en administrator.',
+  })
+  @ApiZodBody(updateGatheringPhotoSchema)
+  @ApiZodResponse(HttpStatus.OK, gatheringDetailSchema)
+  @ApiProblemResponses(403, 404, 409, 422)
+  updatePhoto(
+    @Param('idOrSlug') idOrSlug: string,
+    @Param('photoId') photoId: string,
+    @ZodBody(updateGatheringPhotoSchema) input: UpdateGatheringPhotoInput,
+    @CurrentUser() viewer: AccessTokenClaims,
+  ) {
+    return this.gatherings.updatePhoto(idOrSlug, photoId, input, viewer);
+  }
+
+  @Delete(':idOrSlug/photos/:photoId')
+  @ApiOperation({ summary: 'Fjern billedet og slet filen' })
+  @ApiZodResponse(HttpStatus.OK, gatheringDetailSchema)
+  @ApiProblemResponses(403, 404, 409)
+  removePhoto(
+    @Param('idOrSlug') idOrSlug: string,
+    @Param('photoId') photoId: string,
+    @CurrentUser() viewer: AccessTokenClaims,
+  ) {
+    return this.gatherings.removePhoto(idOrSlug, photoId, viewer);
   }
 }

@@ -5,6 +5,8 @@ import { StarRating } from "@/components/ui/star-rating";
 import { AddItemForm } from "./add-item-form";
 import { ItemNotes } from "./item-notes";
 import { NoteForm } from "./note-form";
+import { PhotoGrid } from "./photo-grid";
+import { PhotoUpload } from "./photo-upload";
 
 /**
  * Arrangementet mens det står på. Rækkefølgen er den som værten har lagt —
@@ -14,7 +16,7 @@ import { NoteForm } from "./note-form";
  * Hvad man må her er ikke gættet lokalt: `viewer` kommer fra API'et, som er
  * det eneste sted reglerne findes.
  */
-export function GatheringLive({ detail }: { detail: GatheringDetail }) {
+export function GatheringLive({ detail, viewerId }: { detail: GatheringDetail; viewerId: string }) {
   const { viewer } = detail;
 
   return (
@@ -84,6 +86,24 @@ export function GatheringLive({ detail }: { detail: GatheringDetail }) {
       )}
 
       {viewer.canAddItems ? <AddItemForm gatheringId={detail.id} /> : null}
+
+      {viewer.canAddPhotos || detail.photos.length > 0 ? (
+        <section className="grid gap-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-ink-muted">
+              Billeder
+            </h2>
+            {viewer.canAddPhotos ? <PhotoUpload gatheringId={detail.id} /> : null}
+          </div>
+
+          <PhotoGrid
+            gatheringId={detail.id}
+            photos={detail.photos}
+            viewerId={viewerId}
+            kanFjerne={viewer.canAddPhotos}
+          />
+        </section>
+      ) : null}
 
       {!viewer.canWriteNotes && viewer.attendeeId !== null && detail.status === "PLANNED" ? (
         <p className="text-sm text-ink-muted">

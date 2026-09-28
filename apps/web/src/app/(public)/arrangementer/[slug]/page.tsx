@@ -99,7 +99,11 @@ export default async function ArrangementPage({ params }: { params: Promise<{ sl
       </header>
 
       <div className="pt-8">
-        {udgivet ? <GatheringPost detail={detail} /> : <GatheringLive detail={detail} />}
+        {udgivet ? (
+          <GatheringPost detail={detail} viewerId={user.id} />
+        ) : (
+          <GatheringLive detail={detail} viewerId={user.id} />
+        )}
       </div>
     </div>
   );

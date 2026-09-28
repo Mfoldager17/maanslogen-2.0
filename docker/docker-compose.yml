@@ -64,7 +64,10 @@ services:
       # bliver ved med at virke.
       DEFAULT_ACCESS_KEY: minioadmin
       DEFAULT_SECRET_KEY: minioadmin
-      DEFAULT_BUCKETS: maanslogen-dev,maanslogen-test
+      # De to sidste er arrangementernes billeder. De står bevidst IKKE i
+      # s3-bootstrap'ens BUCKETS: får de offentlig læsning, er hele pointen
+      # med en privat bucket væk.
+      DEFAULT_BUCKETS: maanslogen-dev,maanslogen-test,maanslogen-privat-dev,maanslogen-privat-test
     volumes:
       - alarik-data:/app/Storage
 

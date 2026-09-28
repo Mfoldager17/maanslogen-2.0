@@ -9,15 +9,18 @@ import type {
   Category,
   Gathering,
   GatheringDetail,
+  GatheringPhotoUpload,
   CreateBeverageInput,
   CreateBrandInput,
   CreateCategoryInput,
   CreateAttributeDefinitionInput,
+  AttachGatheringPhotoInput,
   CreateGatheringInput,
   CreateQuestionInput,
   CreateReviewInput,
   AddGatheringItemInput,
   InviteAttendeeInput,
+  PresignGatheringPhotoInput,
   LoginInput,
   Paginated,
   PresignRequest,
@@ -31,6 +34,7 @@ import type {
   UpdateCategoryInput,
   UpdateGatheringInput,
   UpdateGatheringItemInput,
+  UpdateGatheringPhotoInput,
   UpdateAttributeDefinitionInput,
   UpdateQuestionInput,
   UpdateReviewInput,
@@ -176,6 +180,24 @@ export function createEndpoints(request: Fetcher) {
         request<GatheringDetail>(`/gatherings/${idOrSlug}/items/${itemId}/serve`, {
           method: 'POST',
         }),
+
+      // Billederne ligger i en privat bucket. URL'en til dem kommer med i
+      // arrangementets svar, signeret og kortlivet — der findes ikke noget
+      // endpoint der udleverer en blivende adresse.
+      presignPhoto: (idOrSlug: string, body: PresignGatheringPhotoInput) =>
+        request<GatheringPhotoUpload>(`/gatherings/${idOrSlug}/photos/presign`, {
+          method: 'POST',
+          body,
+        }),
+      attachPhoto: (idOrSlug: string, body: AttachGatheringPhotoInput) =>
+        request<GatheringDetail>(`/gatherings/${idOrSlug}/photos`, { method: 'POST', body }),
+      updatePhoto: (idOrSlug: string, photoId: string, body: UpdateGatheringPhotoInput) =>
+        request<GatheringDetail>(`/gatherings/${idOrSlug}/photos/${photoId}`, {
+          method: 'PATCH',
+          body,
+        }),
+      removePhoto: (idOrSlug: string, photoId: string) =>
+        request<GatheringDetail>(`/gatherings/${idOrSlug}/photos/${photoId}`, { method: 'DELETE' }),
 
       // Noten er din egen; API'et udleder hvem du er af tokenet. Derfor PUT på
       // en fast sti frem for POST med et id — der findes kun én pr. deltager.

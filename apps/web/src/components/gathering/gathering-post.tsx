@@ -3,6 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { StarRating } from "@/components/ui/star-rating";
 import { formatTime } from "@/lib/format";
 import { ItemNotes } from "./item-notes";
+import { PhotoGrid } from "./photo-grid";
 
 /**
  * Det færdige opslag. Det her er hvad man kommer tilbage til om et år: hvad
@@ -11,10 +12,19 @@ import { ItemNotes } from "./item-notes";
  * Noterne er låst på dette tidspunkt — udgivelsen fryser dem — så der er
  * ingen formularer her, kun tekst.
  */
-export function GatheringPost({ detail }: { detail: GatheringDetail }) {
+export function GatheringPost({ detail, viewerId }: { detail: GatheringDetail; viewerId: string }) {
   // Kun dem der faktisk skrev noget. "Inviteret, men kom ikke" hører ikke
   // hjemme i et referat af aftenen.
   const medvirkende = detail.attendees.filter((attendee) => attendee.joinedAt !== null);
+
+  // Billeder knyttet til en bestemt servering står ved den; resten er fra
+  // aftenen som helhed og samles til sidst.
+  const tilPost = new Map<string, typeof detail.photos>();
+  const loese = detail.photos.filter((photo) => {
+    if (photo.itemId === null) return true;
+    tilPost.set(photo.itemId, [...(tilPost.get(photo.itemId) ?? []), photo]);
+    return false;
+  });
 
   return (
     <div className="grid gap-10">
@@ -79,10 +89,33 @@ export function GatheringPost({ detail }: { detail: GatheringDetail }) {
 
                 {item.note ? <p className="text-sm text-ink-muted">{item.note}</p> : null}
 
+                {tilPost.has(item.id) ? (
+                  <PhotoGrid
+                    gatheringId={detail.id}
+                    photos={tilPost.get(item.id) ?? []}
+                    viewerId={viewerId}
+                    kanFjerne={detail.viewer.isAdmin}
+                  />
+                ) : null}
+
                 <ItemNotes notes={item.notes} />
               </li>
             ))}
           </ol>
+        </div>
+      ) : null}
+
+      {loese.length > 0 ? (
+        <div>
+          <h2 className="mb-4 text-xs font-semibold uppercase tracking-wider text-ink-muted">
+            Fra aftenen
+          </h2>
+          <PhotoGrid
+            gatheringId={detail.id}
+            photos={loese}
+            viewerId={viewerId}
+            kanFjerne={detail.viewer.isAdmin}
+          />
         </div>
       ) : null}
     </div>
