@@ -17,11 +17,13 @@ export function ActiveFilters({
   filterable,
   categoryLabel,
   typeLabels,
+  brandLabels,
 }: {
   filterable: AttributeDefinition[];
   categoryLabel?: string;
   /** Slug → navn, så chippen viser "Single malt" og ikke slug'en. */
   typeLabels?: Record<string, string>;
+  brandLabels?: Record<string, string>;
 }) {
   const router = useRouter();
   const params = useSearchParams();
@@ -48,6 +50,14 @@ export function ActiveFilters({
     });
   }
 
+  const brands = (params.get("brandSlugs") ?? "").split(",").filter(Boolean);
+  if (brands.length) {
+    chips.push({
+      key: "brandSlugs",
+      label: brands.map((slug) => brandLabels?.[slug] ?? slug).join(", "),
+    });
+  }
+
   const countries = (params.get("countryCodes") ?? "").split(",").filter(Boolean);
   if (countries.length) {
     chips.push({
@@ -57,7 +67,7 @@ export function ActiveFilters({
   }
 
   const minRating = params.get("minRating");
-  if (minRating) chips.push({ key: "minRating", label: `Mindst ${minRating} stjerner` });
+  if (minRating) chips.push({ key: "minRating", label: `${minRating} stjerner og op` });
 
   for (const definition of filterable) {
     const raw = params.get(`attr[${definition.key}]`);
@@ -101,10 +111,13 @@ export function ActiveFilters({
           key={chip.key}
           type="button"
           onClick={() => clear(chip.key)}
-          className="inline-flex h-8 items-center gap-1.5 rounded-full border border-accent-line bg-accent-soft pl-3 pr-2.5 text-xs font-medium text-accent-hover transition-colors hover:bg-accent-soft/70"
+          title={chip.label}
+          // Pillen har fast højde, så etiketten må ikke ombrydes — en lang søgning
+          // eller en liste af lande skrev sig ellers ud over den farvede baggrund.
+          className="inline-flex h-8 max-w-full min-w-0 items-center gap-1.5 rounded-full border border-accent-line bg-accent-soft pl-3 pr-2.5 text-xs font-medium text-accent-hover transition-colors hover:bg-accent-soft/70"
         >
-          {chip.label}
-          <X className="h-3 w-3" aria-hidden="true" />
+          <span className="truncate">{chip.label}</span>
+          <X className="h-3 w-3 shrink-0" aria-hidden="true" />
           <span className="sr-only">Fjern filter</span>
         </button>
       ))}

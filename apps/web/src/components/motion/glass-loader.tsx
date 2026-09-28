@@ -1,3 +1,6 @@
+"use client";
+
+import { useId } from "react";
 import { cn } from "@/lib/cn";
 
 const SIZES = {
@@ -23,18 +26,25 @@ export function GlassLoader({
   className?: string;
 }) {
   const { box, stroke } = SIZES[size];
+  /*
+   * Id'et var hardkodet. Står to indikatorer på samme side — admin-formularen
+   * henter egenskaber mens et billede uploades — peger begge `url(#…)` på den
+   * første, og forsvinder den, mister den anden sin klipning og tegner væsken
+   * som en firkantet klat hen over glasset.
+   */
+  const clipId = useId();
 
   return (
     <div className={cn("flex flex-col items-center gap-3", className)} role="status">
       <svg width={box} height={box} viewBox="0 0 24 24" fill="none" aria-hidden="true">
         <defs>
-          <clipPath id="mlg-glass-clip">
+          <clipPath id={clipId}>
             {/* Formen væsken må fylde — selve glassets indre. */}
             <path d="M7.4 4.6h9.2l-1 12.2a1.6 1.6 0 0 1-1.6 1.5h-4a1.6 1.6 0 0 1-1.6-1.5z" />
           </clipPath>
         </defs>
 
-        <g clipPath="url(#mlg-glass-clip)">
+        <g clipPath={`url(#${clipId})`}>
           <rect
             x="6"
             y="3"

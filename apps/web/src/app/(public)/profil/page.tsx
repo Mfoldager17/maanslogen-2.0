@@ -5,6 +5,7 @@ import { api } from "@/lib/api/api.server";
 import { ReviewList } from "@/components/catalog/review-list";
 import { Badge } from "@/components/ui/badge";
 import { formatDate } from "@/lib/format";
+import { ROLLE_ETIKETTER } from "@/lib/roller";
 
 export const metadata: Metadata = { title: "Min profil" };
 
@@ -23,10 +24,16 @@ export default async function ProfilePage() {
     <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
       <header className="mb-8">
         <div className="mb-2 flex items-center gap-3">
-          <h1 className="font-display text-3xl font-semibold tracking-tight">{user.displayName}</h1>
-          {user.role !== "USER" ? <Badge tone="accent">{user.role}</Badge> : null}
+          <h1 className="min-w-0 break-words font-display text-3xl font-semibold tracking-tight">
+            {user.displayName}
+          </h1>
+          {user.role !== "USER" ? (
+            <Badge tone="accent" className="shrink-0">
+              {ROLLE_ETIKETTER[user.role]}
+            </Badge>
+          ) : null}
         </div>
-        <p className="text-sm text-ink-muted">
+        <p className="break-words text-sm text-ink-muted">
           {user.email} · medlem siden {formatDate(user.createdAt)}
         </p>
       </header>

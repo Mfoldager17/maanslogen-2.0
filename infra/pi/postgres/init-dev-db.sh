@@ -4,11 +4,11 @@
 # Produktionsdatabasen laver billedet selv ud fra POSTGRES_DB. Her oprettes
 # dev-databasen — og vigtigere: en rolle der KUN kan nå den.
 #
-# Uden den adskillelse fik preview-containere og dev-API'et præcis de samme
-# credentials som produktionen, og kun databasenavnet i forbindelses-URL'en
-# skilte dem ad. Det kan ændres inde fra containeren, så enhver preview kunne
-# læse og skrive produktionsdatabasen. Det skulle ikke engang et angreb til;
-# en fejl i et almindeligt PR var nok.
+# Uden den adskillelse fik dev-API'et præcis de samme credentials som
+# produktionen, og kun databasenavnet i forbindelses-URL'en skilte dem ad.
+# Det kan ændres inde fra containeren, så dev — der kører kode fra et PR —
+# kunne læse og skrive produktionsdatabasen. Det skulle ikke engang et angreb
+# til; en fejl i et almindeligt PR var nok.
 set -e
 
 psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" <<SQL

@@ -37,10 +37,11 @@ export default async function AdminReviewsPage({
       key: "beverage",
       header: "Drikkevare",
       render: (row) =>
-        row.beverageSlug ? (
+        row.beverageSlug && row.beverageName ? (
           <Link
             href={`/drikkevarer/${row.beverageSlug}`}
-            className="font-semibold hover:text-accent"
+            className="block truncate font-semibold hover:text-accent"
+            title={row.beverageName}
           >
             {row.beverageName}
           </Link>
@@ -51,9 +52,22 @@ export default async function AdminReviewsPage({
     {
       key: "title",
       header: "Overskrift",
-      render: (row) => <span className="line-clamp-1 text-ink-soft">{row.title ?? "—"}</span>,
+      render: (row) => (
+        <span className="line-clamp-1 text-ink-soft" title={row.title ?? undefined}>
+          {row.title ?? "—"}
+        </span>
+      ),
     },
-    { key: "author", header: "Anmelder", width: "w-40", render: (row) => row.author.displayName },
+    {
+      key: "author",
+      header: "Anmelder",
+      width: "w-40",
+      render: (row) => (
+        <span className="block truncate" title={row.author.displayName}>
+          {row.author.displayName}
+        </span>
+      ),
+    },
     {
       key: "answers",
       header: "Svar",
@@ -73,7 +87,8 @@ export default async function AdminReviewsPage({
     {
       key: "actions",
       header: "",
-      width: "w-14",
+      // 56px minus 32px polstring gav 24px til en 36px knap.
+      width: "w-20",
       align: "right",
       render: (row) => (
         <DeleteReviewAction

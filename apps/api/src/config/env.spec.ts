@@ -28,6 +28,16 @@ describe('loadConfig', () => {
     expect(config.CORS_ORIGINS).toEqual(['http://localhost:3000', 'https://maanslogen.dk']);
   });
 
+  it('behandler en tom COOKIE_DOMAIN som fraværende', () => {
+    // docker compose indsætter "" for en variabel der ikke står i env-filen.
+    // Den må ikke ende som et tomt `Domain=` i Set-Cookie.
+    expect(loadConfig({ ...BASE, COOKIE_DOMAIN: '' }).COOKIE_DOMAIN).toBeUndefined();
+    expect(loadConfig(BASE).COOKIE_DOMAIN).toBeUndefined();
+    expect(loadConfig({ ...BASE, COOKIE_DOMAIN: '.eksempel.dk' }).COOKIE_DOMAIN).toBe(
+      '.eksempel.dk',
+    );
+  });
+
   it('kræver R2-nøgler når STORAGE_DRIVER=r2', () => {
     expect(() => loadConfig({ ...BASE, STORAGE_DRIVER: 'r2' })).toThrowError(/R2_ACCOUNT_ID/);
   });

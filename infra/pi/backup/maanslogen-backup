@@ -1,0 +1,154 @@
+#!/usr/bin/env bash
+#
+# Natligt dump af produktionsdatabasen op i R2.
+#
+# Kun produktionen. Dev-databasen er testdata der kan genskabes med
+# `prisma db seed` på et minut, og et dump af den ville kun være støj.
+#
+# Tre ting er værd at vide om opbygningen:
+#
+#   · Dumpet efterprøves FØR det lægges op. Et halvt dump der lander i
+#     bucketen er værre end intet, for det ser ud som om der er backup.
+#     pg_dump afslutter sin uddata med en fast linje; mangler den, er
+#     forbindelsen røget undervejs, og så stopper vi her.
+#
+#   · pg_dump køres i et postgres-image af samme version som serveren.
+#     pg_dump nægter at dumpe fra en nyere server end sig selv, og værten
+#     har ikke nødvendigvis nogen postgres-klient overhovedet.
+#
+#   · Nøglerne er ikke API'ets. Kan den nøgle der uploader billeder også
+#     slette backupper, er backuppen ikke beskyttet mod det den sikrer imod.
+#     Lav en R2-token der kun har adgang til backup-bucketen, og giv den kun
+#     til denne unit.
+#
+# Genskabelse: se «Backup og genskabelse» i docs/environments.md.
+set -euo pipefail
+
+her="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck source=../load-env.sh
+. "$her/load-env.sh"
+
+DATABASE="${BACKUP_DATABASE:-maanslogen}"
+NETVAERK="${BACKUP_NETWORK:-maanslogen}"
+PG_IMAGE="${BACKUP_PG_IMAGE:-postgres:17-alpine}"
+PRAEFIKS="${BACKUP_PREFIX:-prod}"
+DAGE="${BACKUP_RETENTION_DAYS:-30}"
+
+: "${POSTGRES_USER:?POSTGRES_USER mangler}"
+: "${POSTGRES_PASSWORD:?POSTGRES_PASSWORD mangler}"
+: "${R2_BACKUP_BUCKET:?R2_BACKUP_BUCKET mangler}"
+: "${R2_BACKUP_ACCESS_KEY_ID:?R2_BACKUP_ACCESS_KEY_ID mangler}"
+: "${R2_BACKUP_SECRET_ACCESS_KEY:?R2_BACKUP_SECRET_ACCESS_KEY mangler}"
+
+# Sættes R2_S3_ENDPOINT, bruges den som den er — så kan det samme script
+# afprøves mod en lokal S3-server i stedet for mod R2.
+if [ -n "${R2_S3_ENDPOINT:-}" ]; then
+  ENDEPUNKT="$R2_S3_ENDPOINT"
+else
+  : "${R2_ACCOUNT_ID:?R2_ACCOUNT_ID mangler}"
+  ENDEPUNKT="https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com"
+fi
+
+log() { printf '%s %s\n' "$(date -u +%H:%M:%S)" "$*"; }
+
+arbejde="$(mktemp -d)"
+trap 'rm -rf "$arbejde"' EXIT
+raa="$arbejde/dump.sql"
+pakket="$raa.gz"
+
+# ---- 1. Dump -------------------------------------------------------------
+# --no-owner/--no-privileges: så dumpet kan lægges ind under en anden rolle
+# end den det kom fra. Ved en genskabelse på en frisk maskine er rollenavnene
+# sjældent de samme, og uden dem fejler restore på hver eneste GRANT.
+log "dumper $DATABASE"
+docker run --rm --network "$NETVAERK" \
+  -e PGPASSWORD="$POSTGRES_PASSWORD" \
+  "$PG_IMAGE" \
+  pg_dump -h postgres -U "$POSTGRES_USER" -d "$DATABASE" \
+  --no-owner --no-privileges > "$raa"
+
+# ---- 2. Efterprøv før upload --------------------------------------------
+if ! tail -c 200 "$raa" | grep -q 'PostgreSQL database dump complete'; then
+  log "AFBRUDT: dumpet mangler sin afslutningslinje — det er ufuldstændigt."
+  exit 1
+fi
+
+tabeller=$(grep -c '^CREATE TABLE' "$raa" || true)
+raa_stoerrelse=$(wc -c < "$raa")
+if [ "$tabeller" -eq 0 ]; then
+  log "ADVARSEL: dumpet indeholder ingen tabeller. Er databasen tom?"
+fi
+
+gzip -9 -c "$raa" > "$pakket"
+gzip -t "$pakket"
+pakket_stoerrelse=$(wc -c < "$pakket")
+log "dump ok: $tabeller tabeller, $raa_stoerrelse B → $pakket_stoerrelse B pakket"
+
+# ---- 3. Læg op -----------------------------------------------------------
+noegle="$PRAEFIKS/$(date -u +%Y-%m-%dT%H%M%SZ).sql.gz"
+
+r2() {
+  curl --fail-with-body -sS \
+    --aws-sigv4 "aws:amz:auto:s3" \
+    --user "${R2_BACKUP_ACCESS_KEY_ID}:${R2_BACKUP_SECRET_ACCESS_KEY}" \
+    "$@"
+}
+
+log "lægger op: $noegle"
+r2 --upload-file "$pakket" \
+  -H "Content-Type: application/gzip" \
+  "$ENDEPUNKT/$R2_BACKUP_BUCKET/$noegle" > /dev/null
+
+# Læs den tilbage. Et 200 på PUT er ikke det samme som at objektet kan hentes
+# igen i den størrelse vi sendte.
+hoveder=$(r2 --head "$ENDEPUNKT/$R2_BACKUP_BUCKET/$noegle")
+laengde=$(printf '%s' "$hoveder" | tr -d '\r' | awk 'tolower($1) == "content-length:" { print $2 }')
+if [ "$laengde" != "$pakket_stoerrelse" ]; then
+  log "AFBRUDT: objektet fylder ${laengde:-?} B, men vi sendte $pakket_stoerrelse B."
+  exit 1
+fi
+log "bekræftet i bucketen: $laengde B"
+
+# ---- 4. Ryd op -----------------------------------------------------------
+# Backuppen er i hus på dette tidspunkt. Går oprydningen galt, er det ikke
+# værd at fejle kørslen på — så ligger der bare flere dumps end tænkt.
+if [ "$DAGE" -le 0 ]; then
+  log "opbevaring: slået fra"
+  exit 0
+fi
+
+graense=$(date -u -d "-$DAGE days" +%Y-%m-%d)
+
+# Skråstregen SKAL stå som %2F. curl URL-koder ikke query-værdier, når den
+# bygger den kanoniske forespørgsel til signaturen, men serveren gør — og så
+# regner de to på hver sin streng. Afprøvet mod Alarik:
+#
+#   ?list-type=2                200
+#   ?list-type=2&prefix=prod/   403 SignatureDoesNotMatch
+#   ?list-type=2&prefix=prod%2F 200
+#
+# Fejlen er stille på den værste måde: selve backuppen ligger der, så alt
+# ser rigtigt ud — det er kun oprydningen der aldrig kører.
+praefiks_kodet="${PRAEFIKS//\//%2F}%2F"
+if ! liste=$(r2 "$ENDEPUNKT/$R2_BACKUP_BUCKET?list-type=2&prefix=$praefiks_kodet" 2>&1); then
+  log "ADVARSEL: kunne ikke hente listen, springer oprydning over: $liste"
+  exit 0
+fi
+
+slettet=0
+# Nøglerne er vores egne og indeholder kun ISO-dato og bindestreger, så de
+# kan trækkes ud med grep. ISO-datoer sorterer som tekst, og derfor er en
+# simpel strengsammenligning nok til at afgøre hvad der er for gammelt.
+while IFS= read -r n; do
+  [ -n "$n" ] || continue
+  dato="${n#"$PRAEFIKS"/}"
+  dato="${dato:0:10}"
+  [[ "$dato" < "$graense" ]] || continue
+  if r2 -X DELETE "$ENDEPUNKT/$R2_BACKUP_BUCKET/$n" > /dev/null 2>&1; then
+    slettet=$((slettet + 1))
+  else
+    log "ADVARSEL: kunne ikke slette $n"
+  fi
+done < <(printf '%s' "$liste" | grep -o '<Key>[^<]*</Key>' | sed 's|</\?Key>||g')
+
+log "oprydning: $slettet ældre end $graense slettet"

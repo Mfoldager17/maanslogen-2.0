@@ -346,7 +346,12 @@ export function BeverageForm({
       </div>
 
       <aside className="h-fit rounded-[var(--radius-card)] border border-line bg-surface p-5 xl:sticky xl:top-6">
-        <ImageUpload ownerType="BEVERAGE" value={media} onChange={setMedia} />
+        <ImageUpload
+          ownerType="BEVERAGE"
+          value={media}
+          onChange={setMedia}
+          existing={beverage?.media ?? null}
+        />
       </aside>
     </form>
   );

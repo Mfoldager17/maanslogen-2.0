@@ -1,6 +1,6 @@
 # Udrulning
 
-> Miljøerne — produktion, dev og previews pr. PR — og hvordan de sættes op:
+> Miljøerne — produktion og det fælles dev-miljø — og hvordan de sættes op:
 > [`environments.md`](environments.md). Her står detaljerne om R2, variabler
 > og selve imaget.
 
@@ -21,8 +21,8 @@ udvikling kan køre mod en lokal S3-server med nøjagtig den samme kode.
 
 2. **Giv den et offentligt domæne.** Under bucketens _Settings → Public access_
    kan man enten slå R2.dev-underdomænet til (fint til test) eller tilknytte et
-   eget domæne som `cdn.maanslogen.dk` (anbefalet — R2.dev er rate limited og må
-   ikke bruges i produktion).
+   eget domæne som `media-maanslogen.mathiasfoldager.com` (anbefalet — R2.dev
+   er rate limited og må ikke bruges i produktion).
 
 3. **Lav en API-token** under _R2 → Manage API Tokens_ med adgangen
    _Object Read & Write_ begrænset til den ene bucket. Du får en Access Key ID og
@@ -41,7 +41,7 @@ Browseren uploader direkte til R2 med presignede URL'er, så bucketen skal tilla
 ```json
 [
   {
-    "AllowedOrigins": ["https://maanslogen.dk"],
+    "AllowedOrigins": ["https://maanslogen.mathiasfoldager.com"],
     "AllowedMethods": ["PUT"],
     "AllowedHeaders": ["content-type"],
     "MaxAgeSeconds": 3600
@@ -74,25 +74,25 @@ manglede en nøgle.
 
 ### API (`apps/api`)
 
-| Variabel               | Påkrævet       | Note                                                             |
-| ---------------------- | -------------- | ---------------------------------------------------------------- |
-| `NODE_ENV`             |                | `production` slår ekstra tjek til                                |
-| `PORT`                 |                | Standard 4000                                                    |
-| `DATABASE_URL`         | ✔              |                                                                  |
-| `JWT_ACCESS_SECRET`    | ✔              | Mindst 32 tegn                                                   |
-| `JWT_REFRESH_SECRET`   | ✔              | Mindst 32 tegn, forskellig fra ovenstående                       |
-| `ACCESS_TOKEN_TTL`     |                | Standard `15m`                                                   |
-| `REFRESH_TOKEN_TTL`    |                | Standard `30d`                                                   |
-| `CORS_ORIGINS`         | ✔ i produktion | Komma-separeret                                                  |
-| `COOKIE_DOMAIN`        |                | Fx `.maanslogen.dk`, hvis API og site er på hver sit underdomæne |
-| `STORAGE_DRIVER`       |                | `r2` eller `s3`                                                  |
-| `R2_ACCOUNT_ID`        | ✔ ved `r2`     |                                                                  |
-| `R2_ACCESS_KEY_ID`     | ✔ ved `r2`     |                                                                  |
-| `R2_SECRET_ACCESS_KEY` | ✔ ved `r2`     |                                                                  |
-| `R2_BUCKET`            | ✔ ved `r2`     |                                                                  |
-| `R2_PUBLIC_BASE_URL`   | ✔ ved `r2`     | Fx `https://cdn.maanslogen.dk`                                   |
-| `THROTTLE_LIMIT`       |                | Standard 120 pr. minut                                           |
-| `ENABLE_SWAGGER`       |                | Sæt `false` for at skjule `/docs`                                |
+| Variabel               | Påkrævet       | Note                                                |
+| ---------------------- | -------------- | --------------------------------------------------- |
+| `NODE_ENV`             |                | `production` slår ekstra tjek til                   |
+| `PORT`                 |                | Standard 4000                                       |
+| `DATABASE_URL`         | ✔              |                                                     |
+| `JWT_ACCESS_SECRET`    | ✔              | Mindst 32 tegn                                      |
+| `JWT_REFRESH_SECRET`   | ✔              | Mindst 32 tegn, forskellig fra ovenstående          |
+| `ACCESS_TOKEN_TTL`     |                | Standard `15m`                                      |
+| `REFRESH_TOKEN_TTL`    |                | Standard `30d`                                      |
+| `CORS_ORIGINS`         | ✔ i produktion | Komma-separeret                                     |
+| `COOKIE_DOMAIN`        |                | Udelades normalt — se afsnittet om cookies nedenfor |
+| `STORAGE_DRIVER`       |                | `r2` eller `s3`                                     |
+| `R2_ACCOUNT_ID`        | ✔ ved `r2`     |                                                     |
+| `R2_ACCESS_KEY_ID`     | ✔ ved `r2`     |                                                     |
+| `R2_SECRET_ACCESS_KEY` | ✔ ved `r2`     |                                                     |
+| `R2_BUCKET`            | ✔ ved `r2`     |                                                     |
+| `R2_PUBLIC_BASE_URL`   | ✔ ved `r2`     | Fx `https://media-maanslogen.mathiasfoldager.com`   |
+| `THROTTLE_LIMIT`       |                | Standard 120 pr. minut                              |
+| `ENABLE_SWAGGER`       |                | Sæt `false` for at skjule `/docs`                   |
 
 Generér hemmeligheder med:
 
@@ -116,22 +116,32 @@ ved kørsel:
 
 ```bash
 docker build -f apps/web/Dockerfile \
-  --build-arg NEXT_PUBLIC_API_URL=https://api.maanslogen.dk \
-  --build-arg NEXT_PUBLIC_MEDIA_URL=https://cdn.maanslogen.dk \
+  --build-arg NEXT_PUBLIC_API_URL=https://api-maanslogen.mathiasfoldager.com \
+  --build-arg NEXT_PUBLIC_MEDIA_URL=https://media-maanslogen.mathiasfoldager.com \
   -t maanslogen-web .
 ```
 
 ---
 
-## Cookies på tværs af underdomæner
+## Cookies på tværs af værter
 
-Kører API og site på hver sit underdomæne (`api.maanslogen.dk` og
-`maanslogen.dk`), skal `COOKIE_DOMAIN=.maanslogen.dk` sættes, så cookien
-deles. I produktion sættes de automatisk med `Secure` og `SameSite=None`, hvilket
-kræver HTTPS begge steder.
+`COOKIE_DOMAIN` udelades normalt, og det er med vilje.
 
-Kører begge bag samme domæne (fx `/api` via en reverse proxy), kan
-`COOKIE_DOMAIN` udelades.
+Refresh-cookien sættes af API'et og læses kun af API'et. Uden `COOKIE_DOMAIN`
+bliver den _host-only_: bundet til `api-maanslogen.mathiasfoldager.com` og
+sendt ingen andre steder hen. Det er alt hvad der skal til, fordi browseren
+sender den med på de kald sitet laver til API'et — i produktion sættes
+cookien automatisk med `Secure` og `SameSite=None`, som netop tillader det på
+tværs af værter. Det kræver HTTPS begge steder.
+
+`COOKIE_DOMAIN` giver kun mening hvis cookien skal deles med _andre_ værter,
+og så skal den sættes til en forælder de deler. Her ville det være hele
+`mathiasfoldager.com`, og så fulgte refresh-tokenet med til alt andet på det
+domæne. Derfor ikke.
+
+Den dag API og site ligger under samme projekt-domæne — `api.maanslogen.com`
+og `maanslogen.com` — kan `COOKIE_DOMAIN=.maanslogen.com` sættes, hvis der
+opstår et behov for at dele.
 
 ---
 

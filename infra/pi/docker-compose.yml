@@ -2,13 +2,13 @@
 #   docker compose --env-file .env up -d
 #
 # Preview-containere startes ikke herfra. Agenten (infra/pi/agent/) opretter dem
-# ud fra hvilke PR'er der har label'en "preview", og hægter dem på
+# ud fra om et åbent PR har label'en "dev", og hægter dev-API'et på
 # maanslogen-dev-netværket.
 
 name: maanslogen
 
 networks:
-  # To netværk, så en preview-container ikke kan nå produktions-API'et.
+  # To netværk, så dev-API'et ikke kan nå produktionens database.
   # Postgres og Caddy er med i begge; produktions-API'et kun i det første.
   maanslogen:
     name: maanslogen
@@ -46,7 +46,9 @@ services:
 
   # ---- API i produktion --------------------------------------------------
   api:
-    image: ${GHCR_IMAGE:-ghcr.io/mfoldager17/maanslogen-api}:main
+    # :prod flyttes kun af et release i GitHub — se .github/workflows/release.yml.
+    # Et push til main rører den ikke; det går til api-staging nedenfor.
+    image: ${GHCR_IMAGE:-ghcr.io/mfoldager17/maanslogen-api}:prod
     restart: unless-stopped
     depends_on:
       postgres:
@@ -70,8 +72,41 @@ services:
 
   # ---- Delt dev-API ------------------------------------------------------
   # Kører main-grenens kode mod dev-databasen. Det er den et lokalt `pnpm
-  # dev:remote` peger på. PR-previews får deres egen container ved siden af.
+  # dev:remote` peger på. Det er det eneste dev-API — se docs/environments.md.
   api-dev:
+    # Taggen sættes af agenten: `dev` når et PR har label'en `dev`, ellers
+    # `main`. Skal-værdien her gælder når compose kaldes i hånden.
+    image: ${GHCR_IMAGE:-ghcr.io/mfoldager17/maanslogen-api}:${API_DEV_TAG:-main}
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: '4000'
+      DATABASE_URL: postgresql://maanslogen_dev:${DEV_POSTGRES_PASSWORD}@postgres:5432/maanslogen_dev?schema=public
+      JWT_ACCESS_SECRET: ${DEV_JWT_ACCESS_SECRET}
+      JWT_REFRESH_SECRET: ${DEV_JWT_REFRESH_SECRET}
+      # Dev-siden ligger på et fast workers.dev-alias, og en lokal udvikler
+      # kommer fra localhost. Begge skal kunne kalde med cookies.
+      CORS_ORIGINS: ${DEV_CORS_ORIGINS}
+      STORAGE_DRIVER: r2
+      R2_ACCOUNT_ID: ${R2_ACCOUNT_ID}
+      R2_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID}
+      R2_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY}
+      R2_BUCKET: ${R2_DEV_BUCKET}
+      R2_PUBLIC_BASE_URL: ${DEV_MEDIA_PUBLIC_URL}
+      ENABLE_SWAGGER: 'true'
+    networks: [maanslogen-dev]
+
+  # ---- Staging -----------------------------------------------------------
+  # main-grenens kode. Følger :main, som push til main lægger op.
+  #
+  # Deler database og billedbucket med dev. Det er et bevidst valg: staging
+  # findes for at køre main et rigtigt sted før et release, ikke for at have
+  # sit eget datasæt. Derfor også de samme JWT-nøgler som dev — tokens
+  # valideres mod brugerne i netop den database.
+  api-staging:
     image: ${GHCR_IMAGE:-ghcr.io/mfoldager17/maanslogen-api}:main
     restart: unless-stopped
     depends_on:
@@ -83,9 +118,7 @@ services:
       DATABASE_URL: postgresql://maanslogen_dev:${DEV_POSTGRES_PASSWORD}@postgres:5432/maanslogen_dev?schema=public
       JWT_ACCESS_SECRET: ${DEV_JWT_ACCESS_SECRET}
       JWT_REFRESH_SECRET: ${DEV_JWT_REFRESH_SECRET}
-      # Previews ligger på skiftende workers.dev-adresser, og en lokal
-      # udvikler kommer fra localhost. Begge skal kunne kalde med cookies.
-      CORS_ORIGINS: ${DEV_CORS_ORIGINS}
+      CORS_ORIGINS: ${STAGING_CORS_ORIGINS}
       STORAGE_DRIVER: r2
       R2_ACCOUNT_ID: ${R2_ACCOUNT_ID}
       R2_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID}
@@ -96,18 +129,19 @@ services:
     networks: [maanslogen-dev]
 
   # ---- Router ------------------------------------------------------------
-  # Fordeler på Host-headeren. Den findes for preview-containernes skyld:
-  # uden den skulle tunnelens konfiguration skrives om og genstartes for hver
-  # PR. Med den rører hverken tunnel eller DNS-opsætning et PR.
+  # Fordeler på Host-headeren, så produktion og dev kan dele én tunnel.
+  # Tunnelen giver al trafik til Caddy og skal derfor hverken skrives om
+  # eller genstartes, når dev-miljøet skifter hvilket PR det viser.
   caddy:
     image: caddy:2-alpine
     restart: unless-stopped
     # Caddyfile'en slår værtsnavnene op med {$...}, og Caddy læser dem fra sit
     # eget miljø — ikke fra .env-filen compose bruger. Uden de to linjer bliver
     # host-matcherne tomme, og Caddy nægter at starte med "module value cannot
-    # be null". Det ville tage hele routeren ned, ikke kun previews.
+    # be null". Det ville tage hele routeren ned — også produktionen.
     environment:
       PROD_API_HOST: ${PROD_API_HOST}
+      STAGING_API_HOST: ${STAGING_API_HOST}
       DEV_API_HOST: ${DEV_API_HOST}
       DEPLOY_HOST: ${DEPLOY_HOST}
     # Webhook-modtageren kører på værten, ikke i en container. Uden dette

@@ -35,11 +35,18 @@ export function UserMenu({ user }: { user: User }) {
         <DropdownMenu.Content
           align="end"
           sideOffset={8}
-          className="z-50 min-w-56 rounded-[var(--radius-card)] border border-line bg-surface p-1.5 shadow-[var(--shadow-pop)]"
+          // `w-56` frem for `min-w-56`: med en minimumsbredde voksede panelet med
+          // e-mailens længde, så `truncate` aldrig blev udløst, og ved align="end"
+          // kunne det skubbes ud over skærmkanten på en telefon.
+          className="z-50 w-56 max-w-[calc(100vw-2rem)] rounded-[var(--radius-card)] border border-line bg-surface p-1.5 shadow-[var(--shadow-pop)]"
         >
           <div className="px-3 py-2">
-            <p className="truncate text-sm font-semibold">{user.displayName}</p>
-            <p className="truncate text-xs text-ink-muted">{user.email}</p>
+            <p className="truncate text-sm font-semibold" title={user.displayName}>
+              {user.displayName}
+            </p>
+            <p className="truncate text-xs text-ink-muted" title={user.email}>
+              {user.email}
+            </p>
           </div>
           <DropdownMenu.Separator className="my-1 h-px bg-line" />
 

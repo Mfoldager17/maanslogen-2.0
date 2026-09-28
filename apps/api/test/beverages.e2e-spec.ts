@@ -379,6 +379,27 @@ describe('Drikkevarer og dynamiske attributter (e2e)', () => {
         'IE',
       ]);
     });
+
+    it('lader en dimension stå åben når man filtrerer på netop den', async () => {
+      // Før beregnedes alle facetter med ét fælles filter, så et valgt mærke
+      // fjernede alle andre mærker fra mærkefacetten. Man kunne så hverken
+      // skifte mærke med ét klik eller — i kombination med andre filtre —
+      // finde afkrydsningsfeltet igen for at slå filteret fra.
+      const response = await harness.request({
+        method: 'GET',
+        url: '/api/v1/beverages/facets?brandSlugs=mikkeller',
+      });
+      const facets = response.json();
+
+      const brands = facets.brands.map((bucket: { value: string }) => bucket.value).sort();
+      expect(brands).toContain('mikkeller');
+      expect(brands).toContain('dr-loosen');
+
+      // De øvrige dimensioner skal derimod følge filteret: Mikkeller laver
+      // ikke vin, så rødvin hører ikke hjemme i typefacetten her.
+      const types = facets.types.map((bucket: { value: string }) => bucket.value);
+      expect(types).not.toContain('vin-roedvin');
+    });
   });
 
   describe('dubletter', () => {

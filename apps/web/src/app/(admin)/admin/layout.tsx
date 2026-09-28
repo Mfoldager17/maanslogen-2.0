@@ -5,6 +5,7 @@ import { AdminNav } from "@/components/admin/admin-nav";
 import { Logo } from "@/components/layout/logo";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
 import { Badge } from "@/components/ui/badge";
+import { ROLLE_ETIKETTER } from "@/lib/roller";
 
 /**
  * Adgangen håndhæves af API'et; dette lag sørger blot for at ingen bruger
@@ -17,7 +18,11 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
   return (
     <div className="flex min-h-dvh flex-col lg:flex-row">
-      <aside className="flex shrink-0 flex-col gap-6 border-b border-line bg-surface px-4 py-5 lg:h-dvh lg:w-64 lg:border-b-0 lg:border-r lg:overflow-y-auto">
+      {/*
+       * `sticky`: uden den gav `h-dvh` en spalte der var præcis én skærm høj,
+       * så den hvide flade og skillelinjen stoppede midt nede på en lang liste.
+       */}
+      <aside className="flex shrink-0 flex-col gap-6 border-b border-line bg-surface px-4 py-5 lg:sticky lg:top-0 lg:h-dvh lg:w-64 lg:overflow-y-auto lg:border-b-0 lg:border-r">
         <div className="flex items-center gap-2">
           <Logo href="/" />
           <Badge tone="accent">Admin</Badge>
@@ -28,7 +33,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         <div className="mt-auto flex items-center gap-2 rounded-[var(--radius-control)] bg-sunken p-2.5">
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-semibold">{user.displayName}</p>
-            <p className="truncate text-xs text-ink-muted">{user.role}</p>
+            <p className="truncate text-xs text-ink-muted">{ROLLE_ETIKETTER[user.role]}</p>
           </div>
           <ThemeToggle />
         </div>

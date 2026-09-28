@@ -1,5 +1,13 @@
 @import "tailwindcss";
 
+/*
+ * Temaet styres af klassen `.dark` på <html>, ikke af styresystemet. Uden
+ * denne linje peger Tailwinds `dark:` stadig på `prefers-color-scheme`, og
+ * så viste temaknappen månen i mørkt tema på en lys maskine — og solen i
+ * lyst tema på en mørk.
+ */
+@custom-variant dark (&:where(.dark, .dark *));
+
 /* ==========================================================================
    Designtokens
    Alt farve, radius og skygge lever som CSS-variabler. Mørkt tema skifter kun
@@ -8,9 +16,21 @@
    ========================================================================== */
 
 @theme {
-  --font-sans: var(--font-public-sans), ui-sans-serif, system-ui, sans-serif;
-  --font-display: var(--font-fraunces), Georgia, "Times New Roman", serif;
-  --font-mono: ui-monospace, "SF Mono", Menlo, monospace;
+  /*
+   * Overskrifter i en grotesk med kant; brødtekst i en neutral sans; og
+   * monospace forbeholdt data — tal, enheder, nøgler, tastetryk. Monospace
+   * overalt gør siden til et kostume; monospace kun på målinger gør den
+   * præcis.
+   */
+  /*
+   * Reserven står INDE i var(). Uden den er hele erklæringen ugyldig i det
+   * øjeblik variablen mangler — fx før next/font har sat den, eller hvis
+   * hentningen fejler — og så arver elementet en helt anden skrift i stedet
+   * for at falde ned på systemets monospace.
+   */
+  --font-sans: var(--font-public-sans, ui-sans-serif), system-ui, sans-serif;
+  --font-display: var(--font-space-grotesk, ui-sans-serif), system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains-mono, ui-monospace), "SF Mono", Menlo, monospace;
 
   --color-canvas: var(--canvas);
   --color-surface: var(--surface);
@@ -20,12 +40,23 @@
   --color-ink-muted: var(--ink-muted);
   --color-line: var(--line);
   --color-line-strong: var(--line-strong);
+  --color-grid: var(--grid);
 
   --color-accent: var(--accent);
   --color-accent-hover: var(--accent-hover);
   --color-accent-soft: var(--accent-soft);
   --color-accent-line: var(--accent-line);
   --color-on-accent: var(--on-accent);
+
+  /* Instrumentfarven. Måletal, skalaer og aflæsninger står i den, aldrig i accent. */
+  --color-signal: var(--signal);
+  --color-signal-soft: var(--signal-soft);
+  --color-signal-line: var(--signal-line);
+
+  /* Tredje kodefarve til kategorier og typer, så de kan skelnes uden ikoner. */
+  --color-alt: var(--alt);
+  --color-alt-soft: var(--alt-soft);
+  --color-alt-line: var(--alt-line);
 
   --color-positive: var(--positive);
   --color-positive-soft: var(--positive-soft);
@@ -41,77 +72,112 @@
   --color-star: var(--star);
   --color-star-empty: var(--star-empty);
 
-  --radius-card: 1rem;
-  --radius-control: 0.6875rem;
+  /* Skarpe hjørner. Et instrument er ikke afrundet. */
+  --radius-card: 0.375rem;
+  --radius-control: 0.25rem;
 
-  --shadow-raise: 0 1px 2px rgb(28 25 23 / 0.04), 0 8px 24px -12px rgb(28 25 23 / 0.14);
-  --shadow-pop: 0 4px 12px rgb(28 25 23 / 0.08), 0 24px 48px -24px rgb(28 25 23 / 0.28);
+  --shadow-raise: var(--raise);
+  --shadow-pop: var(--pop);
 }
 
 :root {
-  color-scheme: light;
-
-  --canvas: #fbf8f3;
-  --surface: #ffffff;
-  --sunken: #f4efe7;
-  --ink: #1c1917;
-  --ink-soft: #55504a;
-  --ink-muted: #6b625a;
-  --line: #e7e0d6;
-  --line-strong: #d8cfc2;
-
-  --accent: #a8492a;
-  --accent-hover: #7d3520;
-  --accent-soft: #f7e9e2;
-  --accent-line: #ddb9a8;
-  --on-accent: #ffffff;
-
-  --positive: #2e5e4e;
-  --positive-soft: #e3efe6;
-  --positive-ink: #24503f;
-
-  --warning-soft: #f7efdc;
-  --warning-ink: #7a5a12;
-
-  --danger: #a5322c;
-  --danger-soft: #f9e7e5;
-  --danger-line: #edc9c5;
-
-  --star: #b0700f;
-  --star-empty: #ded2c0;
-}
-
-.dark {
   color-scheme: dark;
 
-  --canvas: #171310;
-  --surface: #211b17;
-  --sunken: #1c1714;
-  --ink: #f5efe7;
-  --ink-soft: #c8bcb0;
-  --ink-muted: #a79a8e;
-  --line: #342b24;
-  --line-strong: #463a31;
+  /* Grafit med et køligt stik — ikke sort, så hårfine linjer stadig ses. */
+  --canvas: #0a0c0d;
+  --surface: #111517;
+  --sunken: #0d1011;
+  --ink: #e8eef2;
+  --ink-soft: #a3b3bd;
+  --ink-muted: #71838f;
+  --line: #1d2427;
+  --line-strong: #2c363b;
+  --grid: #191f23;
 
-  --accent: #e08055;
-  --accent-hover: #ec9670;
-  --accent-soft: #3a251b;
-  --accent-line: #5c3a29;
-  --on-accent: #1c1917;
+  --accent: #ffa348;
+  --accent-hover: #ffb968;
+  --accent-soft: #2a1e0e;
+  --accent-line: #5a3f18;
+  --on-accent: #12100b;
 
-  --positive: #68a88e;
-  --positive-soft: #1e322a;
-  --positive-ink: #9bcfb6;
+  --signal: #4dd4c4;
+  --signal-soft: #0f2926;
+  --signal-line: #1f4f49;
 
-  --warning-soft: #33280f;
-  --warning-ink: #e3c476;
+  --alt: #c48bff;
+  --alt-soft: #241a33;
+  --alt-line: #452f63;
 
-  --danger: #e87c74;
-  --danger-soft: #3a1f1d;
-  --danger-line: #5c302c;
+  --positive: #57d9a3;
+  --positive-soft: #10281f;
+  --positive-ink: #7ce8bc;
 
-  --star: #e0a94a;
-  --star-empty: #3a322a;
+  --warning-soft: #2b2310;
+  --warning-ink: #e8c66a;
+
+  --danger: #ff6b6b;
+  --danger-soft: #2b1416;
+  --danger-line: #5c2a2c;
+
+  --star: #ffb02e;
+  --star-empty: #2a3035;
+
+  /*
+   * Løftet er en kant, ikke en sky. Den ydre ring bærer formen; den bløde
+   * skygge ligger kun under for at give dybde på en næsten sort flade.
+   */
+  --raise: 0 0 0 1px var(--line-strong), 0 10px 30px -18px rgb(0 0 0 / 0.9);
+  --pop: 0 0 0 1px var(--line-strong), 0 24px 60px -24px rgb(0 0 0 / 0.95);
+}
+
+/*
+ * Lyst tema er ikke det samme design vendt om — det er den samme terminal på
+ * papir. Samme skarpe kanter og samme monospace, men blækket er mørkt og
+ * accenterne er dæmpet så de holder kontrast mod hvidt.
+ */
+.light {
+  color-scheme: light;
+
+  --canvas: #f6f7f5;
+  --surface: #ffffff;
+  --sunken: #eceee9;
+  --ink: #12171a;
+  --ink-soft: #414d54;
+  --ink-muted: #5c6b74;
+  --line: #dfe3df;
+  --line-strong: #c6cdc7;
+  --grid: #e8ebe7;
+
+  --accent: #b45309;
+  --accent-hover: #8a3f06;
+  --accent-soft: #fdf1e0;
+  --accent-line: #e8c79a;
+  --on-accent: #ffffff;
+
+  --signal: #0e7490;
+  --signal-soft: #e0f2f6;
+  --signal-line: #a9d7e3;
+
+  --alt: #6d28d9;
+  --alt-soft: #f0e9fe;
+  --alt-line: #cdb8f5;
+
+  --positive: #0f766e;
+  --positive-soft: #e2f2ef;
+  --positive-ink: #0c5d56;
+
+  --warning-soft: #fbf1d8;
+  --warning-ink: #7a5a12;
+
+  --danger: #b42318;
+  --danger-soft: #fdeceb;
+  --danger-line: #f0c7c3;
+
+  --star: #b0700f;
+  --star-empty: #d5d9d4;
+
+  --raise: 0 0 0 1px var(--line), 0 8px 24px -18px rgb(18 23 26 / 0.35);
+  --pop: 0 0 0 1px var(--line-strong), 0 20px 48px -24px rgb(18 23 26 / 0.45);
 }
 
 @layer base {
@@ -170,13 +236,18 @@
   }
 }
 
+/*
+ * Kun vippet — centreringen sidder på beholderen. Lå `translateX(-50%)` her,
+ * mistede bølgen sin placering i det øjeblik animationen ikke kørte, og med
+ * "reducer bevægelse" slået til hoppede den en halv bredde til højre.
+ */
 @keyframes mlg-surface-wobble {
   0%,
   100% {
-    transform: translateX(-50%) rotate(-2.5deg) scaleY(1);
+    transform: rotate(-2.5deg) scaleY(1);
   }
   50% {
-    transform: translateX(-50%) rotate(2.5deg) scaleY(0.85);
+    transform: rotate(2.5deg) scaleY(0.85);
   }
 }
 
@@ -257,12 +328,19 @@
   }
 }
 
+/*
+ * Fliser præcis én gang pr. omgang. Flisen er `background-size` (200 % af
+ * elementet), og et procent-skift på -200 % flytter baggrunden nøjagtig én
+ * flise — så slutbilledet er identisk med startbilledet, og løkken er
+ * sømløs. Den gamle udgave flyttede 1,855 flise og sprang derfor synligt
+ * hvert 1,6. sekund. Retningen er nu venstre mod højre.
+ */
 @keyframes mlg-shimmer {
-  0% {
-    background-position: -120% 0;
+  from {
+    background-position: 0 0;
   }
-  100% {
-    background-position: 220% 0;
+  to {
+    background-position: -200% 0;
   }
 }
 
@@ -277,6 +355,110 @@
   }
 }
 
+/* ==========================================================================
+   Terminal & instrument
+   Bevægelserne herunder skal føles som noget der aflæses og afsættes, ikke
+   som noget der svæver. Alt er stadig pynt: intet layout afhænger af dem.
+   ========================================================================== */
+
+/* Rækker der ruller ind nedefra, som linjer i en log. */
+@keyframes mlg-stream-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* En nål der svinger forbi sit maal og falder på plads. */
+@keyframes mlg-needle {
+  0% {
+    transform: scaleX(0);
+  }
+  62% {
+    transform: scaleX(1.04);
+  }
+  100% {
+    transform: scaleX(1);
+  }
+}
+
+/* Et svagt lys der stryger hen over en flade, én gang, når den kommer frem. */
+@keyframes mlg-scan {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(200%);
+  }
+}
+
+@utility animate-stream-in {
+  animation: mlg-stream-in 0.34s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@utility animate-needle {
+  transform-origin: left center;
+  animation: mlg-needle 0.85s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/*
+ * Hårfint målegitter. Det ligger på canvas, ikke på kort, så fladen bag
+ * indholdet har en struktur at hvile på uden at støje.
+ */
+@utility grid-backdrop {
+  background-image:
+    linear-gradient(to right, var(--grid) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--grid) 1px, transparent 1px);
+  background-size: 2.5rem 2.5rem;
+}
+
+/*
+ * Hjørnemærker som på et måleinstrument. Tegnet med to lag baggrund i hvert
+ * hjørne, så der ikke skal bruges pseudoelementer et kort måske selv bruger.
+ */
+@utility corner-marks {
+  position: relative;
+
+  &::before,
+  &::after {
+    content: "";
+    position: absolute;
+    width: 0.5rem;
+    height: 0.5rem;
+    pointer-events: none;
+    border-color: var(--line-strong);
+  }
+
+  &::before {
+    top: -1px;
+    left: -1px;
+    border-top: 1px solid;
+    border-left: 1px solid;
+  }
+
+  &::after {
+    right: -1px;
+    bottom: -1px;
+    border-right: 1px solid;
+    border-bottom: 1px solid;
+  }
+}
+
+/* Etiketter: små, spærrede versaler i monospace. Fladen er fuld af dem. */
+@utility label-mono {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  line-height: 1rem;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+
 @utility animate-pour {
   animation: mlg-pour 1.4s cubic-bezier(0.34, 1.2, 0.64, 1) forwards;
 }
@@ -289,11 +471,12 @@
 @utility skeleton {
   background-image: linear-gradient(
     100deg,
-    var(--sunken) 30%,
+    var(--sunken) 40%,
     color-mix(in oklab, var(--sunken) 60%, var(--surface)) 50%,
-    var(--sunken) 70%
+    var(--sunken) 60%
   );
-  background-size: 220% 100%;
+  background-size: 200% 100%;
+  background-repeat: repeat;
   animation: mlg-shimmer 1.6s linear infinite;
 }
 
@@ -307,6 +490,11 @@
   *::after {
     animation-duration: 0.001ms !important;
     animation-iteration-count: 1 !important;
+    /*
+     * `both`: uden den springer alt tilbage til tilstanden før animationen,
+     * så boblerne blev stående som faste prikker i stedet for at forsvinde.
+     */
+    animation-fill-mode: both !important;
     transition-duration: 0.001ms !important;
   }
 }

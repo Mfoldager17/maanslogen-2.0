@@ -3,6 +3,8 @@
 import { roleSchema, type Role } from "@maanslogen/contracts";
 import { useId } from "react";
 import { api } from "@/lib/api/api.browser";
+import { NativeSelect } from "@/components/ui/field";
+import { ROLLE_ETIKETTER } from "@/lib/roller";
 import { useApiMutation } from "@/lib/use-mutation";
 
 /**
@@ -26,7 +28,7 @@ export function UserRoleSelect({
       <label htmlFor={id} className="sr-only">
         Rolle
       </label>
-      <select
+      <NativeSelect
         id={id}
         defaultValue={role}
         disabled={disabled || mutation.pending}
@@ -35,14 +37,13 @@ export function UserRoleSelect({
             success: "Rollen er opdateret",
           })
         }
-        className="h-9 rounded-[var(--radius-control)] border border-line-strong bg-surface px-2 text-sm disabled:opacity-60"
       >
         {roleSchema.options.map((option) => (
           <option key={option} value={option}>
-            {option}
+            {ROLLE_ETIKETTER[option]}
           </option>
         ))}
-      </select>
+      </NativeSelect>
     </>
   );
 }

@@ -49,21 +49,36 @@ export default async function AdminBeveragesPage({
             <Link
               href={`/drikkevarer/${row.slug}`}
               className="block truncate font-semibold hover:text-accent"
+              title={row.name}
             >
               {row.name}
             </Link>
-            <span className="block truncate text-xs text-ink-muted">/{row.slug}</span>
+            <span className="block truncate text-xs text-ink-muted" title={`/${row.slug}`}>
+              /{row.slug}
+            </span>
           </div>
         </div>
       ),
     },
-    { key: "brand", header: "Mærke", width: "w-40", render: (row) => row.brandName },
+    {
+      key: "brand",
+      header: "Mærke",
+      width: "w-40",
+      render: (row) => (
+        <span className="block truncate" title={row.brandName}>
+          {row.brandName}
+        </span>
+      ),
+    },
     {
       key: "type",
       header: "Type",
       width: "w-40",
       render: (row) => (
-        <span className="text-ink-soft">
+        <span
+          className="block truncate text-ink-soft"
+          title={`${row.categoryName} › ${row.typeName}`}
+        >
           {row.categoryName} › {row.typeName}
         </span>
       ),
@@ -71,7 +86,8 @@ export default async function AdminBeveragesPage({
     {
       key: "rating",
       header: "Bedømmelse",
-      width: "w-36",
+      // w-36 var 10px for smal til stjerner + snit + et firecifret antal.
+      width: "w-44",
       render: (row) =>
         row.rating.count === 0 ? (
           <span className="text-xs text-ink-muted">—</span>

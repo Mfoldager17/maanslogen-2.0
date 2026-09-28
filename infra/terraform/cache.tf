@@ -13,7 +13,7 @@ resource "cloudflare_ruleset" "media_cache" {
   rules = [{
     ref         = "media_immutable"
     description = "Billeder fra R2 caches et år på kanten"
-    expression  = "(http.host in {\"media.${var.domain}\" \"media.${local.dev_domain}\"})"
+    expression  = "(http.host in {\"${local.vaert.media}\" \"${local.vaert.media_dev}\"})"
     action      = "set_cache_settings"
 
     action_parameters = {

@@ -70,13 +70,11 @@ describe('beverageListQuerySchema', () => {
     expect(parsed.brandSlugs).toEqual(['lagavulin']);
   });
 
-  it('holder stadig typeIds til id\'er alene', () => {
+  it("holder stadig typeIds til id'er alene", () => {
     // Slug-vejen er en tilføjelse, ikke en opblødning: et `typeIds` med en
     // slug i er stadig en fejl, så gamle links ikke stille begynder at
     // matche noget andet end de plejede.
-    expect(() =>
-      beverageListQuerySchema.parse({ typeIds: 'whisky-skotsk-single-malt' }),
-    ).toThrow();
+    expect(() => beverageListQuerySchema.parse({ typeIds: 'whisky-skotsk-single-malt' })).toThrow();
   });
 
   it('afviser limit over maks', () => {

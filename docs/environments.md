@@ -1,22 +1,43 @@
 # Miljøer
 
-To miljøer. **Produktion** kører altid. **Dev** findes kun så længe der er et
-åbent PR — eller så længe du selv har noget kørende lokalt.
+Tre trin, og de flyttes af hver sin ting:
+
+| Trin           | Flyttes af              | Image   |
+| -------------- | ----------------------- | ------- |
+| **Dev**        | Label'en `dev` på et PR | `:dev`  |
+| **Staging**    | Push til `main`         | `:main` |
+| **Produktion** | Et **release** i GitHub | `:prod` |
+
+Et push til main går altså ikke længere i produktion. Det går til staging, og
+produktionen flytter sig først når du laver et release — og kun til kode der
+allerede har stået på staging: release-workflowet bygger ikke noget nyt, det
+forfremmer det image der blev bygget for den commit.
+
+Dev og staging deler database og billedbucket. Det er et bevidst valg:
+staging findes for at køre main et rigtigt sted før et release, ikke for at
+have sit eget datasæt.
+
+Der er ét dev-miljø, ikke ét pr. PR. Har tre PR'er label'en, får det seneste
+der blev bygget miljøet — de andre venter ikke i kø, de bliver bare
+overtaget. Koden til ét preview pr. PR ligger parkeret i
+[`preview.yml.parkeret`](../.github/workflows/preview.yml.parkeret) og nederst
+i agenten, så den kan tages op igen.
 
 ```
 GitHub-hosted runner            Cloudflare             Pi'en
 ────────────────────            ──────────             ─────────────────────
 ubuntu-24.04-arm                Workers (web)          Postgres
-  bygger arm64-image              maanslogen.dk          · maanslogen
+  bygger arm64-image              maanslogen-web          · maanslogen
        │                               │                  · maanslogen_dev
        ▼                               │ fetch
-     GHCR                              ▼                 api        (prod)
-  · :main                         Tunnel ─► Caddy ─►     api-dev    (main)
-  · :pr-42                                               api-pr-42  (preview)
-       │                                                      ▲
-       │   GitHub ringer på, og agenten spørger:              │
-       │     · hvilke åbne PR'er har label "preview"?          │
-       │     · er der et nyt :main-image?                      │
+     GHCR                              ▼                 api         (:prod)
+  · :prod  ← release              Tunnel ─► Caddy ─►     api-staging (:main)
+  · :main  ← push til main                               api-dev     (:dev)
+  · :dev   ← label på et PR                                    ▲
+       │                                                       │
+       │   GitHub ringer på, og agenten spørger:               │
+       │     · har et åbent PR label'en "dev"?                 │
+       │     · er der nye :prod-, :main- eller :dev-images?    │
        └───────────────────────────────────────────►  maanslogen-agent
 ```
 
@@ -26,14 +47,14 @@ ikke beskeden, den spørger GitHub selv og udfører kun `docker pull` og
 `docker run` med argumenter, den selv bestemmer ud fra kode der ligger på
 `main`. Se [`infra/pi/agent/`](../infra/pi/agent/).
 
-|          | Produktion              | Dev                                        |
-| -------- | ----------------------- | ------------------------------------------ |
-| Web      | Worker `maanslogen-web` | Worker-**version** pr. PR, egen URL        |
-| API      | Container på Pi'en      | Container pr. PR + ét delt dev-API         |
-| Database | `maanslogen`            | `maanslogen_dev` — **én, fælles**          |
-| Billeder | `maanslogen-media`      | `maanslogen-media-dev`                     |
-| Opstår   | Push til `main`         | Når label'en `preview` sættes              |
-| Lever    | Altid                   | Indtil label'en fjernes eller PR'et lukkes |
+|          | Produktion              | Staging                | Dev                                  |
+| -------- | ----------------------- | ---------------------- | ------------------------------------ |
+| Web      | Worker `maanslogen-web` | Alias `staging`        | Alias `dev`                          |
+| API      | `api`                   | `api-staging`          | `api-dev`                            |
+| Database | `maanslogen`            | `maanslogen_dev`       | `maanslogen_dev` — **delt**          |
+| Billeder | `maanslogen-media`      | `maanslogen-media-dev` | `maanslogen-media-dev`               |
+| Følger   | Seneste release         | `main`                 | PR med label'en `dev`, ellers `main` |
+| Lever    | Altid                   | Altid                  | Altid — skifter hvad den viser       |
 
 ---
 
@@ -42,9 +63,11 @@ ikke beskeden, den spørger GitHub selv og udfører kun `docker pull` og
 **Web på Workers.** Next 16 kører på Workers gennem
 [`@opennextjs/cloudflare`](https://opennext.js.org/cloudflare). Bundlen er
 1,5 MB gzippet mod gratisplanens 3 MB, og gratisplanen giver 100.000
-forespørgsler om dagen. Previews bruger `wrangler versions upload`, som
-lægger en version op med sin egen URL **uden** at røre den der er udrullet.
-Derfor er der ingen Worker at rydde op i bagefter.
+forespørgsler om dagen. Dev bruger `wrangler versions upload` med aliaset
+`dev`, som lægger en version op på sin egen faste URL **uden** at røre den
+der er udrullet. Derfor er der ingen Worker at rydde op i bagefter — og
+adressen er den samme fra gang til gang, så CORS-listen på Pi'en ikke skal
+følge med fra PR til PR.
 
 **API på Pi'en.** Du spurgte om der fandtes et gratis alternativ. Kort svar:
 ikke et der er bedre end Pi'en.
@@ -54,7 +77,7 @@ ikke et der er bedre end Pi'en.
 | Render free           | Sover efter 15 minutter. Første besøgende venter ~50 sekunder.       |
 | Fly.io                | Ikke længere rigtig gratis — pay-as-you-go med et månedligt minimum. |
 | Cloudflare Containers | Kræver Workers Paid, fra 5 $/md.                                     |
-| Koyeb free            | Én tjeneste, og så er der ikke plads til previews.                   |
+| Koyeb free            | Én tjeneste, og så er der ikke plads til dev ved siden af.           |
 | Oracle Always Free    | Reelt gratis og stærk nok, men tilmelding og kapacitet driller.      |
 
 Og uanset hvad skal databasen ligge et sted med vedvarende lagring. Når
@@ -65,11 +88,44 @@ ikke være en fast IP-adresse, og Pi'ens adresse bliver aldrig offentlig.
 Skal det senere flyttes, er det kun `infra/pi/` der skal skiftes ud —
 imaget er det samme, og web'en kender kun et værtsnavn.
 
-**Én dev-database.** Previews og lokal udvikling deler `maanslogen_dev`.
+**Én dev-database.** Dev-miljøet og lokal udvikling deler `maanslogen_dev`.
 Det er enklere end en database pr. PR, og det er det du bad om. Konsekvensen
 står nedenfor, og den er værd at kende.
 
 ---
+
+## Hvorfor navnene ser sådan ud
+
+Alle værtsnavne har formen `<rolle>-maanslogen.mathiasfoldager.com`:
+
+| Rolle        | Værtsnavn                                    |
+| ------------ | -------------------------------------------- |
+| Site         | `maanslogen.mathiasfoldager.com`             |
+| API          | `api-maanslogen.mathiasfoldager.com`         |
+| API staging  | `api-staging-maanslogen.mathiasfoldager.com` |
+| API dev      | `api-dev-maanslogen.mathiasfoldager.com`     |
+| Billeder     | `media-maanslogen.mathiasfoldager.com`       |
+| Billeder dev | `media-dev-maanslogen.mathiasfoldager.com`   |
+| Webhook      | `deploy-maanslogen.mathiasfoldager.com`      |
+
+Bindestreg mellem rolle og projekt, ikke punktum — og det er ikke en smagssag.
+Cloudflares gratis universalcertifikat dækker `*.mathiasfoldager.com`, men
+**ikke** `*.*.mathiasfoldager.com`. Et navn som `api.dev.maanslogen.mathiasfoldager.com`
+ville derfor stå uden certifikat og kun kunne nås gennem et betalt Advanced
+Certificate. Ét niveau under zonen, altid.
+
+Det er også derfor `COOKIE_DOMAIN` ikke sættes: se
+[`deployment.md`](deployment.md#cookies-på-tværs-af-værter).
+
+De fem navne Terraform opretter — API'erne og billeddomænerne — bygges ét
+sted, i `local.vaert` i
+[`infra/terraform/variables.tf`](../infra/terraform/variables.tf). Den dag
+`maanslogen.com` er købt, er det de fem linjer der bliver til
+`api.maanslogen.com` osv., og `dns.tf` og `cache.tf` læser derfra.
+
+Sitet ligger på en Worker og har ingen DNS-record her; webhook-navnet
+oprettes af [`infra/scripts/dns-record.sh`](../infra/scripts/dns-record.sh).
+De to skal rettes i hånden.
 
 ## Sæt det op
 
@@ -85,8 +141,9 @@ skal findes, før Pi'en kan komme op.
 | 3   | Pi'en                                             | klon, `.env`, `compose up`, skema og seed |
 | 4   | Agenten                                           | systemd-tjenesten der henter fra GHCR     |
 | 5   | Webhooken                                         | så du slipper for at vente på timeren     |
-| 6   | GitHub                                            | hemmeligheder, variabler, `preview`-label |
+| 6   | GitHub                                            | hemmeligheder, variabler, `dev`-label     |
 | 7   | Første `wrangler deploy`                          | så Worker'en findes                       |
+| 8   | Backup                                            | natligt dump af produktionen op i R2      |
 
 ### 1. Cloudflare
 
@@ -113,8 +170,8 @@ Bagefter, i hånden i dashboardet:
 
 - **Tunnelens ingress**: én regel, alt videre til `http://caddy:8080`.
 - **R2 → hver bucket → Settings → Public access → Custom domains**: knyt
-  `media.maanslogen.dk` til prod-bucketen og `media.dev.maanslogen.dk` til
-  dev-bucketen.
+  `media-maanslogen.mathiasfoldager.com` til prod-bucketen og
+  `media-dev-maanslogen.mathiasfoldager.com` til dev-bucketen.
 - **Caching → Tiered Cache**: slå Smart Tiered Caching til. Gratis, og det
   skærer i Class B-operationerne. Se [`r2-omkostninger.md`](r2-omkostninger.md).
 
@@ -125,7 +182,7 @@ privat som udgangspunkt**, og Pi'en har med vilje ingen credentials — så
 `docker pull` ville svare `denied`, og agenten ville vente i det uendelige på
 et image den ikke må se.
 
-Efter første vellykkede kørsel af _Udrul_: gå til repoets forside →
+Efter første vellykkede kørsel af _Staging_: gå til repoets forside →
 **Packages** → `maanslogen-api` → _Package settings_ → **Change visibility** →
 _Public_.
 
@@ -168,7 +225,7 @@ sudo chmod 600 /etc/maanslogen/pi.env
 ```
 
 Udfyld filen. Hemmeligheder genereres med `openssl rand -base64 48`, og prod og
-dev skal have **hvert sit** sæt JWT-nøgler, så et token fra et preview ikke
+dev skal have **hvert sit** sæt JWT-nøgler, så et token fra dev ikke
 virker i produktion. `CLOUDFLARE_TUNNEL_TOKEN` kommer fra
 `terraform output -raw tunnel_token`.
 
@@ -250,7 +307,7 @@ sudo systemctl start maanslogen-agent    # kør med det samme
 > 1. **Der findes et image i GHCR.** Et PR fra en fork får et skrivebeskyttet
 >    `GITHUB_TOKEN` og kan derfor ikke lægge et image op. Det er ikke en regel
 >    vi håndhæver — det er noget en fork ikke _kan_.
-> 2. **PR'et har label'en `preview`**, og labels kan kun sættes af nogen med
+> 2. **PR'et har label'en `dev`**, og labels kan kun sættes af nogen med
 >    skriveadgang. Et tilfældigt PR udefra gør altså ingenting, før du selv
 >    beder om det.
 > 3. **Grenen ligger i repoet selv.** Tjekkes både i workflowet og i agenten.
@@ -275,7 +332,7 @@ På Pi'en:
 ```bash
 # Læg hemmeligheden i samme fil som resten
 echo "WEBHOOK_SECRET=$(openssl rand -hex 32)" | sudo tee -a /etc/maanslogen/pi.env
-echo "DEPLOY_HOST=deploy.maanslogen.dk" | sudo tee -a /etc/maanslogen/pi.env
+echo "DEPLOY_HOST=deploy-maanslogen.mathiasfoldager.com" | sudo tee -a /etc/maanslogen/pi.env
 
 sudo cp /opt/maanslogen/infra/pi/agent/maanslogen-webhook.service /etc/systemd/system/
 sudo systemctl daemon-reload
@@ -287,22 +344,21 @@ DNS for `deploy.<domæne>` oprettes som de øvrige:
 
 ```bash
 CF_API_TOKEN=... CF_ZONE_ID=... CF_TUNNEL_ID=... \
-  infra/scripts/dns-record.sh upsert deploy.maanslogen.dk
+  infra/scripts/dns-record.sh upsert deploy-maanslogen.mathiasfoldager.com
 ```
 
 I GitHub: _Settings → Webhooks → Add webhook_
 
 | Felt         | Værdi                                                     |
 | ------------ | --------------------------------------------------------- |
-| Payload URL  | `https://deploy.maanslogen.dk/github`                     |
+| Payload URL  | `https://deploy-maanslogen.mathiasfoldager.com/github`    |
 | Content type | `application/json`                                        |
 | Secret       | den samme streng som `WEBHOOK_SECRET`                     |
 | Events       | _Let me select individual events_ → kun **Workflow runs** |
 
-`workflow_run` er nok til det hele. Den fyrer når `Udrul` er færdig med at
-lægge et `:main`-image op, og når `Preview` er færdig med et `:pr-<n>` — og
-også når oprydningen har kørt. Ét hændelsestype dækker både udrulning,
-oprettelse og nedrivning.
+`workflow_run` er nok til det hele. Den fyrer når `Staging` er færdig med et
+`:main`-image, når `Dev` er færdig med et `:dev`, og når `Produktion` har
+forfremmet et `:prod`. Én hændelsestype dækker alle tre trin.
 
 > **Hvorfor det er forsvarligt at have en endpoint ind mod hjemmet.**
 > Beskeden er kun en dørklokke. Modtageren læser ikke indholdet, den vækker
@@ -316,8 +372,10 @@ oprettelse og nedrivning.
 
 ### 6. Hemmeligheder, variabler og label i GitHub
 
-Opret først label'en **`preview`** under _Issues → Labels_. Den er porten til
-et preview-miljø; uden den sker der ingenting, når du sætter den på et PR.
+Opret først label'en **`dev`** under _Issues → Labels_ — præcis den
+stavemåde, med småt. Den er porten til dev-miljøet; uden den sker der
+ingenting, når du sætter den på et PR. Navnet skal matche `DEV_LABEL` i
+`/etc/maanslogen/pi.env` og betingelsen i `dev.yml`.
 
 _Settings → Secrets and variables → Actions_.
 
@@ -332,20 +390,28 @@ Secrets:
 
 Variables:
 
-| Navn                | Eksempel                  |
-| ------------------- | ------------------------- |
-| `WORKER_NAME`       | `maanslogen-web`          |
-| `WORKERS_SUBDOMAIN` | `dit-navn.workers.dev`    |
-| `DEV_DOMAIN`        | `dev.maanslogen.dk`       |
-| `PROD_API_HOST`     | `api.maanslogen.dk`       |
-| `PROD_MEDIA_HOST`   | `media.maanslogen.dk`     |
-| `DEV_MEDIA_HOST`    | `media.dev.maanslogen.dk` |
+| Navn                | Eksempel                                     |
+| ------------------- | -------------------------------------------- |
+| `WORKER_NAME`       | `maanslogen-web`                             |
+| `WORKERS_SUBDOMAIN` | `dit-navn.workers.dev`                       |
+| `PROD_API_HOST`     | `api-maanslogen.mathiasfoldager.com`         |
+| `STAGING_API_HOST`  | `api-staging-maanslogen.mathiasfoldager.com` |
+| `DEV_API_HOST`      | `api-dev-maanslogen.mathiasfoldager.com`     |
+| `PROD_MEDIA_HOST`   | `media-maanslogen.mathiasfoldager.com`       |
+| `DEV_MEDIA_HOST`    | `media-dev-maanslogen.mathiasfoldager.com`   |
+
+Alle fem er hele værtsnavne. Der var før en `DEV_DOMAIN`, som workflowet satte
+`api.` foran — den findes ikke længere, netop fordi navnene ikke stables i
+niveauer mere. Se «Hvorfor navnene ser sådan ud» ovenfor.
+
+`STAGING_API_HOST` bruges af staging-workflowet; billederne henter staging fra
+`DEV_MEDIA_HOST`, fordi den deler bucket med dev.
 
 ### 7. Første udrulning
 
 ```bash
 cd apps/web
-CLOUDFLARE_API_TOKEN=... NEXT_PUBLIC_API_URL=https://api.maanslogen.dk pnpm cf:deploy
+CLOUDFLARE_API_TOKEN=... NEXT_PUBLIC_API_URL=https://api-maanslogen.mathiasfoldager.com pnpm cf:deploy
 ```
 
 Worker'en skal findes én gang, før `versions upload` kan lægge versioner op i
@@ -359,30 +425,153 @@ docker ps                              # postgres, api, api-dev, caddy, cloudfla
 journalctl -u maanslogen-agent -n 20   # "api: opdateret" eller ingen ændring
 
 # Udefra
-curl -s https://api.maanslogen.dk/api/v1/health/ready
-curl -s https://maanslogen.dk -o /dev/null -w '%{http_code}\n'
+curl -s https://api-maanslogen.mathiasfoldager.com/api/v1/health/ready
+curl -s https://maanslogen.mathiasfoldager.com -o /dev/null -w '%{http_code}\n'
 ```
+
+### 8. Backup af produktionen
+
+Produktionsdatabasen findes ét sted, på én disk, i dit hjem. Booter Pi'en fra
+et SD-kort, er det også den mest sandsynlige hardwarefejl du har.
+
+Kun produktionen tages der backup af. Dev-databasen er testdata, som
+`prisma db seed` genskaber på et minut, og et dump af den ville kun være støj.
+
+Lav først en **egen** R2-token under _R2 → Manage API tokens_ med Object Read &
+Write, begrænset til `maanslogen-backup`. Ikke den samme som API'et bruger til
+billeder: kan nøglen der uploader billeder også slette dumps, er backuppen ikke
+beskyttet mod det den er der for at overleve. Læg den i env-filen som
+`R2_BACKUP_ACCESS_KEY_ID` og `R2_BACKUP_SECRET_ACCESS_KEY`.
+
+```bash
+sudo cp /opt/maanslogen/infra/pi/backup/maanslogen-backup.{service,timer} /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now maanslogen-backup.timer
+
+# Kør den med det samme frem for at vente til 03:15
+sudo systemctl start maanslogen-backup
+journalctl -u maanslogen-backup -n 20
+```
+
+En kørsel skriver fire linjer og skal ende med `oprydning`:
+
+```
+dumper maanslogen
+dump ok: 20 tabeller, 11296808 B → 2023612 B pakket
+lægger op: prod/2026-09-27T031500Z.sql.gz
+bekræftet i bucketen: 2023612 B
+oprydning: 0 ældre end 2026-08-28 slettet
+```
+
+Dumpet efterprøves **før** det lægges op, og læses tilbage **efter**. Et halvt
+dump i bucketen er værre end intet, for så ser der ud til at være backup.
+
+---
+
+## Backup og genskabelse
+
+Timeren kører 03:15 med op til et kvarters spredning, og `Persistent=true`
+betyder at en nat hvor Pi'en var slukket bliver indhentet ved næste opstart.
+Dumps beholdes 30 dage (`BACKUP_RETENTION_DAYS`).
+
+**En backup du aldrig har lagt tilbage, er ikke en backup.** Prøv det her én
+gang nu, mens der ikke er noget på spil — ikke første gang du får brug for det.
+
+```bash
+cd /opt/maanslogen/infra/pi
+. ./load-env.sh
+
+r2() {
+  curl --fail-with-body -sS --aws-sigv4 "aws:amz:auto:s3" \
+    --user "${R2_BACKUP_ACCESS_KEY_ID}:${R2_BACKUP_SECRET_ACCESS_KEY}" "$@"
+}
+vaert="https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com/${R2_BACKUP_BUCKET}"
+
+# 1. Find den nyeste. Bemærk %2F — en rå skråstreg i query-strengen får
+#    signaturen til ikke at passe, og svaret bliver 403.
+noegle=$(r2 "${vaert}?list-type=2&prefix=prod%2F" \
+  | grep -o '<Key>[^<]*</Key>' | sed 's|</\?Key>||g' | sort | tail -1)
+echo "$noegle"
+
+# 2. Hent og pak ud
+r2 "${vaert}/${noegle}" -o /tmp/genskab.sql.gz
+gunzip -f /tmp/genskab.sql.gz
+
+# 3. Læg den i en NY database først. Aldrig direkte oven i produktionen —
+#    er dumpet forkert, har du så mistet begge dele.
+docker compose --env-file "$MAANSLOGEN_ENV_FILE" exec -T postgres \
+  psql -U "$POSTGRES_USER" -d postgres -c 'CREATE DATABASE maanslogen_genskabt'
+docker compose --env-file "$MAANSLOGEN_ENV_FILE" exec -T postgres \
+  psql -U "$POSTGRES_USER" -d maanslogen_genskabt -v ON_ERROR_STOP=1 -q < /tmp/genskab.sql
+
+# 4. Se efter at der er noget i den
+docker compose --env-file "$MAANSLOGEN_ENV_FILE" exec -T postgres \
+  psql -U "$POSTGRES_USER" -d maanslogen_genskabt \
+  -c 'select count(*) from beverages' -c 'select count(*) from reviews'
+```
+
+Ser det rigtigt ud, kan `api` pekes på den nye database, eller den gamle
+omdøbes væk og den nye tage dens navn. Der er med vilje ikke noget script til
+det trin: en genskabelse er sjælden og dyr at gøre forkert, og de to linjer
+skal skrives bevidst frem for at blive kaldt.
+
+Dumpet er ren SQL med `--no-owner --no-privileges`, så det kan lægges ind
+under et andet rollenavn end det kom fra. Ved en genskabelse på en frisk
+maskine hedder rollerne sjældent det samme, og uden dem ville hver eneste
+GRANT fejle.
+
+---
+
+## Fra main til produktion
+
+1. Du merger et PR. `Staging` bygger `:main` og `:<sha>`, og lægger web op på
+   aliaset `staging`. Agenten genstarter `api-staging`.
+2. Du prøver det af på staging-adresserne. Produktionen er urørt.
+3. Du laver et **release** i GitHub på den commit. `Produktion` forfremmer
+   `:<sha>` til `:prod` og `:<tag>` — uden at bygge noget nyt — og udruller
+   web'en med `wrangler deploy`.
+4. Agenten ser det nye `:prod`, migrerer produktionsdatabasen og genstarter
+   `api`.
+
+**Forfremmelsen er porten.** Release-workflowet bygger ikke fra kildekode; det
+sætter et nyt tag på det image der allerede ligger. Findes der ikke et image
+for release'ets commit, stopper det med en forklaring. Du kan altså ikke
+udrulle kode der aldrig har været på main og igennem staging — ikke fordi en
+regel forbyder det, men fordi der ikke er noget at forfremme.
+
+Et **pre-release** springes over. Det er en prøveballon, ikke en udrulning.
+
+> **Første gang.** `:prod` findes ikke, før du har lavet det første release.
+> Indtil da lader agenten produktionen stå på det den allerede kører og
+> skriver `prod: intet :prod-image (intet release endnu)` i loggen. Den
+> falder med vilje ikke tilbage til `:main` — det ville omgå hele pointen.
 
 ---
 
 ## Sådan kører et PR
 
 1. Du åbner et PR. **Der sker ingenting endnu.**
-2. Du sætter label'en `preview`. Det er porten, og den kan kun åbnes af nogen
+2. Du sætter label'en `dev`. Det er porten, og den kan kun åbnes af nogen
    med skriveadgang.
-3. `preview.yml` bygger API-imaget på en `ubuntu-24.04-arm`-runner — native
-   arm64, og gratis på et offentligt repo — og lægger det i GHCR som
-   `:pr-<n>`. Samtidig bygges web'en og lægges op som en Worker-version med
-   aliaset `pr-<n>`, og DNS-navnet oprettes.
+3. `dev.yml` bygger API-imaget på en `ubuntu-24.04-arm`-runner — native
+   arm64, og gratis på et offentligt repo — og lægger det i GHCR som `:dev`.
+   Samtidig bygges web'en og lægges op som en Worker-version på aliaset
+   `dev`. Begge tags er faste; der oprettes ingen DNS-navne, for
+   `api.dev.<domæne>` findes allerede fra Terraform.
 4. Når workflowet er færdigt, sender GitHub en webhook til Pi'en. Agenten
-   vækkes med det samme, ser at PR'et står på listen, henter imaget, migrerer
-   dev-databasen og starter
-   `maanslogen-api-pr-<n>`. Caddy genkender `api-pr-<n>.` i Host-headeren og
-   sender videre — hverken tunnel eller Caddy skal røres.
+   vækkes med det samme, ser at et PR har label'en, henter `:dev`, migrerer
+   dev-databasen og genstarter `api-dev` på det image. Caddy kender allerede
+   værtsnavnet — hverken tunnel eller Caddy skal røres.
 5. En kommentar på PR'et får adresserne. Nye commits opdaterer den samme
    kommentar.
-6. Du fjerner label'en eller lukker PR'et. Workflowet fjerner DNS-navnet, og
-   agenten ser ved næste kørsel at PR'et er væk og stopper containeren.
+6. Du fjerner label'en fra alle PR'er. Agenten ser ved næste kørsel at ingen
+   gør krav på miljøet, og sætter `api-dev` tilbage på `:main`.
+
+**Der er ét miljø.** Sætter du label'en på PR nummer to, overtager det
+miljøet fra det første — uden at spørge, og uden at det første får besked.
+Workflowet kører i ét globalt `concurrency`-spor med `cancel-in-progress`,
+så en igangværende bygning bliver afbrudt af den næste. Det er hele
+mekanikken bag "den seneste vinder".
 
 De to adresser kan regnes ud på forhånd, så web og API ikke venter på
 hinanden. Det er også derfor `NEXT_PUBLIC_API_URL` sættes ved **build** og
@@ -390,8 +579,9 @@ ikke som en binding på Worker'en: Next inliner alt med `NEXT_PUBLIC_`-præfiks
 ind i bundlen, også i serverkoden, så en binding ville blive skygget af
 værdien der allerede står der. Det står uddybet i `apps/web/wrangler.jsonc`.
 
-Højst tre previews kører ad gangen (`MAX_PREVIEWS`). Hver tager omkring
-250 MB, og produktionen skal have plads.
+Ét dev-API ad gangen. Det var netop pladsen der var grunden til at previews
+havde et loft (`MAX_PREVIEWS`, tre stykker à ~250 MB) — med ét fælles miljø
+er det spørgsmål væk.
 
 ---
 
@@ -417,7 +607,7 @@ dev-API'et. Postgres og S3-serveren behøver ikke køre. Tilbage igen med
 `cp apps/web/.env.example apps/web/.env.local`.
 
 **Lokalt API mod dev-databasen** — når fejlen er i API-koden, men data skal
-være de samme som i previews. Databasen lytter kun på docker-netværket, så
+være de samme som i dev-miljøet. Databasen lytter kun på docker-netværket, så
 lav en tunnel først:
 
 ```bash
@@ -430,10 +620,10 @@ pnpm dev:api
 
 ## Den fælles dev-database
 
-Den deles af alle previews og af alle der udvikler lokalt. Det er enkelt, og
+Den deles af dev-miljøet og af alle der udvikler lokalt. Det er enkelt, og
 det koster:
 
-- **En migrering i et PR rammer alle andre previews med det samme.**
+- **En migrering i et PR rammer alle der udvikler lokalt med det samme.**
   Agenten kører `migrate deploy` inden containeren starter. Prisma-
   migreringer går kun fremad og er som regel additive, så det går sjældent
   galt — men et PR der fjerner en kolonne, fjerner den for alle.
@@ -467,7 +657,7 @@ FATAL: permission denied for database "maanslogen"
 DETAIL: User does not have CONNECT privilege.
 ```
 
-Den adskillelse er vigtigere end den ser ud. Uden den fik previews præcis
+Den adskillelse er vigtigere end den ser ud. Uden den fik dev-miljøet præcis
 samme credentials som produktionen, og kun databasenavnet i forbindelses-URL'en
 skilte dem ad — ét ord, som enhver kode i containeren kan ændre.
 
@@ -485,6 +675,7 @@ skema.
 | Tunnel  | Gratis                                                   |
 | DNS     | Gratis                                                   |
 | Pi'en   | Strøm                                                    |
+| Backup  | ~2 MB pr. nat, 30 dages opbevaring — 60 MB af R2' 10 GB  |
 
 **GitHub Actions.** Repoet er offentligt, og på offentlige repoer er
 GitHub-hostede runnere gratis uden loft. Målt på en rigtig kørsel: 239
@@ -500,13 +691,16 @@ Gøres repoet privat, tæller de GitHub-hostede jobs med i den månedlige pulje
 | -------------------------- | ------------------ | ------ |
 | CI · typecheck, lint, test | `ubuntu-latest`    | ~2 min |
 | CI · Docker-images         | `ubuntu-latest`    | ~4 min |
-| Udrul/Preview · API-image  | `ubuntu-24.04-arm` | ~4 min |
-| Udrul/Preview · web        | `ubuntu-latest`    | ~4 min |
-| DNS og kommentar           | `ubuntu-latest`    | <1 min |
+| Staging/Dev · API-image    | `ubuntu-24.04-arm` | ~4 min |
+| Staging/Dev · web          | `ubuntu-latest`    | ~4 min |
+| Produktion · forfremmelse  | `ubuntu-latest`    | <1 min |
+| Produktion · web           | `ubuntu-latest`    | ~4 min |
+| Kommentar                  | `ubuntu-latest`    | <1 min |
 | Agent og nulstilling af db | Pi'en, ingen CI    | gratis |
 
-Cirka 15 minutter pr. push til et PR med preview, altså omkring 130 pushes om
-måneden inden for de 2.000. Bemærk at `ubuntu-24.04-arm` kun er gratis på
+Cirka 15 minutter pr. push til et PR med label'en `dev`, altså omkring 130
+pushes om måneden inden for de 2.000. Med ét miljø er der desuden højst ét
+PR der bruger dem ad gangen. Bemærk at `ubuntu-24.04-arm` kun er gratis på
 offentlige repoer — på et privat repo tæller den med som alle andre.
 
 Det eneste der reelt kan vælte tallene, er R2's Class B-operationer, og dem
@@ -522,23 +716,30 @@ Class B.
 
 ## Når noget driller
 
-**Preview'et kommer ikke op.** Tjek i rækkefølge:
+**Dev viser stadig den gamle kode.** Tjek i rækkefølge:
 
-1. Har PR'et label'en `preview`? Uden den sker der intet.
-2. Kørte `preview.yml` og lagde et image op? Se _Actions_, og
-   _Packages_ på repoet.
+1. Har PR'et label'en `dev`? Præcis den stavemåde, med småt. Uden den sker
+   der intet.
+2. Kørte `dev.yml` og lagde et image op? Se _Actions_, og _Packages_ på
+   repoet. Husk at workflowet afbrydes, hvis et andet PR gør krav på miljøet
+   imens — det er meningen, men det ligner en fejl i Actions.
 3. Har agenten set det? På Pi'en: `journalctl -u maanslogen-agent -n 50`.
-   Den skriver `pr-42: intet image i GHCR endnu — venter`, hvis den kom først.
-4. Er der plads? `MAX_PREVIEWS` er 3. Agenten tager de laveste PR-numre.
+   Den skriver `dev: label sat, men intet :dev-image endnu — bliver på main`,
+   hvis den kom først.
+4. Hvilket image kører den? `docker inspect --format '{{.Config.Image}}'
+maanslogen-api-dev`. Står der `:main`, har agenten ikke set label'en.
 
-**Preview'et svarer 502.** Caddy fandt ikke containeren.
-`docker ps | grep pr-` og `docker logs maanslogen-api-pr-<n>`. Oftest gik den
-ned ved opstart på en manglende variabel i `/etc/maanslogen/pi.env`. Husk at
-containeren kører med `--read-only`; skriver koden uden for `/tmp`, fejler den.
+**Dev svarer 502.** Caddy fandt ikke containeren.
+`docker ps | grep api-dev` og `docker logs maanslogen-api-dev`. Oftest gik den
+ned ved opstart på en manglende variabel i `/etc/maanslogen/pi.env`.
 
-**Preview'et svarer 404 med "ukendt vært".** Caddy kender ikke værtsnavnet.
-Enten passer `PROD_API_HOST`/`DEV_API_HOST` ikke med DNS, eller også er navnet
-ikke på formen `api-pr-<cifre>.`.
+**Dev svarer 404 med "ukendt vært".** Caddy kender ikke værtsnavnet.
+`PROD_API_HOST`/`DEV_API_HOST` passer ikke med DNS.
+
+**Web-siden kan ikke kalde API'et (CORS).** Dev-sidens adresse er fast
+(`https://dev-<worker>.<subdomæne>.workers.dev`), men den skal stå i
+`DEV_CORS_ORIGINS` på Pi'en. Det var netop den liste der skulle følge med fra
+PR til PR, dengang hver preview havde sin egen adresse.
 
 **Agenten gør ingenting.** `systemctl list-timers maanslogen-agent.timer`.
 Rammer du GitHubs grænse på 60 kald i timen (uautentificeret), står det i

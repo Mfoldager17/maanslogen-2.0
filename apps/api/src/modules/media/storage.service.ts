@@ -16,7 +16,7 @@ export interface PresignedPut {
 
 /**
  * Objektlager bag ét interface. Produktionen kører på Cloudflare R2 (ingen
- * egress-omkostninger, indbygget CDN); lokalt kører MinIO på samme S3-API.
+ * egress-omkostninger, indbygget CDN); lokalt kører Alarik på samme S3-API.
  *
  * Til forskel fra 1.0 kan denne service ikke oprette eller slette buckets.
  * Den forrige udgave havde et cron-job der listede alle buckets og slettede
@@ -33,8 +33,16 @@ export class StorageService implements OnModuleInit {
     if (config.STORAGE_DRIVER === 'r2') {
       this.bucket = config.R2_BUCKET as string;
       this.publicBaseUrl = (config.R2_PUBLIC_BASE_URL as string).replace(/\/+$/, '');
+      // `WHEN_REQUIRED`, ikke standardens `WHEN_SUPPORTED`: fra og med
+      // @aws-sdk/client-s3 3.729 lægger SDK'et selv en CRC32-sum på enhver
+      // PutObject. Ved en presignet URL bliver den beregnet på signerings-
+      // tidspunktet — hvor kroppen er tom — og lagt i query-strengen som
+      // `x-amz-checksum-crc32=AAAAAA==` (CRC32 af nul bytes). Browseren
+      // sender bagefter de rigtige bytes, og objektlageret afviser med
+      // checksum-mismatch. Målt på vores egen presign før rettelsen.
       this.client = new S3Client({
         region: 'auto',
+        requestChecksumCalculation: 'WHEN_REQUIRED',
         endpoint: `https://${config.R2_ACCOUNT_ID as string}.r2.cloudflarestorage.com`,
         credentials: {
           accessKeyId: config.R2_ACCESS_KEY_ID as string,
@@ -51,6 +59,8 @@ export class StorageService implements OnModuleInit {
       );
       this.client = new S3Client({
         region: config.S3_REGION,
+        // Se noten ved R2-klienten ovenfor.
+        requestChecksumCalculation: 'WHEN_REQUIRED',
         endpoint,
         credentials: {
           accessKeyId: config.S3_ACCESS_KEY_ID as string,

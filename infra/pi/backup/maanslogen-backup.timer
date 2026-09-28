@@ -1,0 +1,14 @@
+[Unit]
+Description=Tag backup af produktionen hver nat
+
+[Timer]
+# 03:15 og ikke 03:00: alt andet i verden kører på hele timer.
+OnCalendar=*-*-* 03:15:00
+RandomizedDelaySec=15min
+
+# Pi'en står hjemme og kan have været slukket klokken tre. Uden denne ville
+# en nat uden strøm blive en nat uden backup, uden at nogen opdagede det.
+Persistent=true
+
+[Install]
+WantedBy=timers.target

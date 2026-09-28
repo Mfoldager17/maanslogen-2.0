@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Filter, Plus, Star } from "lucide-react";
 import { api } from "@/lib/api/api.server";
+import { alleSider } from "@/lib/api/alle-sider";
 import { AdminPageHeader } from "@/components/admin/page-header";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -17,10 +18,10 @@ const TYPE_LABELS: Record<string, string> = {
 export default async function AdminAttributesPage() {
   const [definitions, categories] = await Promise.all([
     api.attributes.list({ limit: 100, sort: "sortOrder" }),
-    api.categories.list({ limit: 50 }),
+    alleSider(api.categories.list, { sort: "sortOrder" }),
   ]);
 
-  const categoryName = new Map(categories.items.map((category) => [category.id, category.name]));
+  const categoryName = new Map(categories.map((category) => [category.id, category.name]));
 
   return (
     <>
@@ -54,10 +55,13 @@ export default async function AdminAttributesPage() {
             <li key={definition.id}>
               <Link
                 href={`/admin/attributter/${definition.id}`}
-                className="flex h-full flex-col gap-2 rounded-[var(--radius-card)] border border-line bg-surface p-4 transition-colors hover:border-accent-line"
+                className="flex h-full flex-col gap-2 rounded-[var(--radius-card)] border border-line bg-surface px-5 py-4 transition-colors hover:border-accent-line"
               >
                 <div className="flex items-start gap-2">
-                  <span className="min-w-0 flex-1 truncate font-semibold">
+                  <span
+                    className="min-w-0 flex-1 truncate font-semibold"
+                    title={definition.displayName}
+                  >
                     {definition.displayName}
                   </span>
                   {definition.filterable ? (
@@ -68,7 +72,10 @@ export default async function AdminAttributesPage() {
                   ) : null}
                 </div>
 
-                <code className="block truncate text-xs text-ink-muted">{definition.key}</code>
+                {/* Nøglen er låst for evigt — man skal kunne læse hele. */}
+                <code className="block truncate text-xs text-ink-muted" title={definition.key}>
+                  {definition.key}
+                </code>
 
                 <div className="mt-auto flex flex-wrap gap-1.5 pt-1">
                   <Badge>{TYPE_LABELS[definition.dataType] ?? definition.dataType}</Badge>
@@ -76,7 +83,15 @@ export default async function AdminAttributesPage() {
                   {definition.required ? <Badge tone="accent">Påkrævet</Badge> : null}
                 </div>
 
-                <p className="text-xs text-ink-muted">
+                {/* En lang kommaliste trak ellers hele gitterrækken i højden. */}
+                <p
+                  className="line-clamp-2 text-xs text-ink-muted"
+                  title={
+                    definition.categoryIds.length === 0
+                      ? "Alle kategorier"
+                      : definition.categoryIds.map((id) => categoryName.get(id) ?? "?").join(", ")
+                  }
+                >
                   {definition.categoryIds.length === 0
                     ? "Alle kategorier"
                     : definition.categoryIds.map((id) => categoryName.get(id) ?? "?").join(", ")}

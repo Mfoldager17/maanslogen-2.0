@@ -7,6 +7,7 @@ import { serverApiOrNull } from "@/lib/api/server";
 import type { Beverage, TasteProfile } from "@maanslogen/contracts";
 import { MediaImage } from "@/components/catalog/media-image";
 import { RatingSummaryPanel } from "@/components/catalog/rating-summary";
+import { Panel } from "@/components/ui/panel";
 import { TasteProfilePanel } from "@/components/catalog/taste-profile";
 import { ReviewList } from "@/components/catalog/review-list";
 import { Button } from "@/components/ui/button";
@@ -48,7 +49,7 @@ export default async function BeveragePage({ params }: Params) {
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
-      <nav aria-label="Brødkrumme" className="mb-6 text-sm text-ink-muted">
+      <nav aria-label="Brødkrumme" className="mb-6 font-mono text-xs text-ink-muted">
         <Link href="/katalog" className="hover:text-ink">
           Katalog
         </Link>
@@ -63,22 +64,29 @@ export default async function BeveragePage({ params }: Params) {
             </Link>
           </>
         ) : null}
-        <span className="mx-1.5">/</span>
+        <span className="mx-1.5 text-line-strong">/</span>
         <span className="text-ink">{beverage.name}</span>
       </nav>
 
-      <div className="grid gap-8 lg:grid-cols-[20rem_1fr_16rem]">
+      {/*
+       * Tre knækpunkter, ikke ét. Med kun `lg` var billedet enten låst til
+       * 20rem eller `w-full` med fast kvadrat — og derimellem voksede det med
+       * vinduet: målt til 718×718 ved 768px bredde, altså 80% af skærmhøjden
+       * på en tablet. Fra `sm` står det derfor ved siden af teksten i en smal
+       * kolonne, og på telefon har det et loft.
+       */}
+      <div className="grid gap-8 sm:grid-cols-[minmax(0,15rem)_1fr] sm:grid-rows-[auto_1fr] lg:grid-cols-[20rem_1fr_16rem] lg:grid-rows-none">
         <MediaImage
           media={beverage.media}
           alt={beverage.name}
           variant="FULL"
           categoryName={beverage.category?.name}
-          className="aspect-square w-full rounded-[var(--radius-card)] border border-line"
-          sizes="(max-width: 1024px) 100vw, 20rem"
+          className="aspect-square w-full max-w-[22rem] rounded-[var(--radius-card)] border border-line sm:max-w-none"
+          sizes="(max-width: 640px) 100vw, (max-width: 1024px) 15rem, 20rem"
           priority
         />
 
-        <div className="flex flex-col gap-5">
+        <div className="flex min-w-0 flex-col gap-5 sm:row-span-2 lg:row-span-1">
           <div>
             <div className="mb-2 flex flex-wrap items-center gap-2 text-sm">
               {beverage.brand ? (
@@ -103,7 +111,7 @@ export default async function BeveragePage({ params }: Params) {
               {beverage.vintage ? <Badge>Årgang {beverage.vintage}</Badge> : null}
             </div>
 
-            <h1 className="font-display text-4xl font-semibold leading-tight tracking-tight">
+            <h1 className="break-words font-display text-3xl font-bold leading-tight tracking-tight sm:text-4xl">
               {beverage.name}
             </h1>
 
@@ -119,35 +127,45 @@ export default async function BeveragePage({ params }: Params) {
           </div>
 
           {beverage.attributes.length > 0 ? (
-            <section aria-labelledby="egenskaber" className="border-t border-line pt-5">
-              <h2
-                id="egenskaber"
-                className="mb-3 text-xs font-bold uppercase tracking-[0.12em] text-ink-muted"
-              >
-                Egenskaber
-              </h2>
-              <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            /*
+             * Egenskaberne står som en aflæsning: nøglen til venstre, værdien
+             * til højre, én pr. linje. Et gitter af kasser gav felter der var
+             * smallere end etiketter som "Serveringstemperatur".
+             */
+            <Panel title="Egenskaber" tone="signal" meta={`${beverage.attributes.length}`}>
+              <dl className="flex flex-col divide-y divide-line">
                 {beverage.attributes.map((attribute) => (
                   <div
                     key={attribute.definitionId}
-                    className="rounded-[var(--radius-control)] border border-line bg-surface px-3.5 py-3"
+                    className="flex items-baseline justify-between gap-4 py-2 first:pt-0 last:pb-0"
                   >
-                    <dt className="text-xs text-ink-muted">{attribute.displayName}</dt>
-                    <dd className="font-display text-xl font-semibold">{attribute.displayValue}</dd>
+                    <dt className="label-mono min-w-0 break-words">{attribute.displayName}</dt>
+                    <dd className="tabular shrink-0 break-words text-right font-mono text-sm text-ink">
+                      {attribute.displayValue}
+                    </dd>
                   </div>
                 ))}
               </dl>
-            </section>
+            </Panel>
           ) : null}
         </div>
 
-        <RatingSummaryPanel rating={beverage.rating} />
+        <RatingSummaryPanel rating={beverage.rating} className="self-start" />
       </div>
 
       <div className="mt-12 grid gap-10 lg:grid-cols-[20rem_1fr]">
-        {profile ? <TasteProfilePanel profile={profile} /> : <div />}
+        {/*
+         * `TasteProfilePanel` returnerer selv null uden besvarede spørgsmål, så
+         * `profile ? …` alene efterlod en tom 20rem-spalte ved siden af en
+         * sammenklemt anmeldelsesliste.
+         */}
+        {profile && profile.entries.length > 0 ? (
+          <TasteProfilePanel profile={profile} className="self-start" />
+        ) : (
+          <div />
+        )}
 
-        <section aria-labelledby="anmeldelser">
+        <section aria-labelledby="anmeldelser" className="min-w-0">
           <h2 id="anmeldelser" className="mb-4 font-display text-xl font-semibold">
             Anmeldelser
           </h2>

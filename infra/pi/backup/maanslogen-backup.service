@@ -1,0 +1,23 @@
+[Unit]
+Description=Dump af produktionsdatabasen op i R2
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/opt/maanslogen/infra/pi/backup/maanslogen-backup
+
+# Samme bruger som agenten: kun med i docker-gruppen, ikke root. Den skal
+# læse hemmelighedsfilen og kalde docker, intet andet.
+User=maanslogen
+Group=docker
+
+NoNewPrivileges=true
+# Dumpet skrives til et privat /tmp og findes ikke uden for denne kørsel.
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/run/docker.sock
+
+[Install]
+WantedBy=multi-user.target

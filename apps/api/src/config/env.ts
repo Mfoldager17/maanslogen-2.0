@@ -32,7 +32,18 @@ const envSchema = z
           .map((origin) => origin.trim())
           .filter(Boolean),
       ),
-    COOKIE_DOMAIN: z.string().optional(),
+    /**
+     * Udelades normalt — så bliver cookien host-only på API'ets eget
+     * værtsnavn. Se docs/deployment.md.
+     *
+     * Tom streng tælles som fraværende: docker compose indsætter `""` for en
+     * variabel der ikke står i env-filen, og den skulle nødig ende som et
+     * tomt `Domain=` i Set-Cookie.
+     */
+    COOKIE_DOMAIN: z
+      .string()
+      .optional()
+      .transform((value) => value || undefined),
 
     THROTTLE_TTL_SECONDS: z.coerce.number().int().positive().default(60),
     THROTTLE_LIMIT: z.coerce.number().int().positive().default(120),
@@ -47,7 +58,7 @@ const envSchema = z
     R2_ACCESS_KEY_ID: z.string().optional(),
     R2_SECRET_ACCESS_KEY: z.string().optional(),
     R2_BUCKET: z.string().optional(),
-    /** Offentligt domæne foran bucketen, fx https://cdn.maanslogen.dk */
+    /** Offentligt domæne foran bucketen, fx https://media-maanslogen.mathiasfoldager.com */
     R2_PUBLIC_BASE_URL: z.string().optional(),
 
     S3_ENDPOINT: z.string().optional(),

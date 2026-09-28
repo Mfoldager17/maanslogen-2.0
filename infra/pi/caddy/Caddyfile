@@ -17,25 +17,31 @@
 		reverse_proxy api:4000
 	}
 
-	# Det delte dev-API (main-grenens kode mod dev-databasen).
+	# Staging: main-grenens kode mod dev-databasen.
+	@staging host {$STAGING_API_HOST}
+	handle @staging {
+		reverse_proxy api-staging:4000
+	}
+
+	# Dev: koden fra det PR der har label'en "dev" — ellers main.
 	@dev host {$DEV_API_HOST}
 	handle @dev {
 		reverse_proxy api-dev:4000
 	}
 
-	# Preview pr. PR: api-pr-42.dev.eksempel.dk -> maanslogen-api-pr-42:4000.
+	# PARKERET: ét preview pr. PR — api-pr-42.dev... -> maanslogen-api-pr-42.
 	#
-	# Nummeret tages ud af værtsnavnet og sættes ind i containernavnet, så en ny
-	# PR hverken kræver en ny regel her eller en genstart af Caddy. Regexp'en
-	# tillader kun cifre; alt andet falder igennem til 404 nedenfor.
-	@preview header_regexp pr Host ^api-pr-(\d+)\.
-	handle @preview {
-		reverse_proxy maanslogen-api-pr-{http.regexp.pr.1}:4000 {
-			# En preview-container der ikke findes (lukket PR, DNS ikke ryddet
-			# op) skal give et klart svar frem for at hænge.
-			fail_duration 5s
-		}
-	}
+	# Dev-miljøet er nu ét fælles, som @dev ovenfor dækker, og der oprettes
+	# ingen api-pr-*-navne længere. Reglen ligger her urørt, så den kan tages
+	# i brug igen sammen med .github/workflows/preview.yml.parkeret og
+	# preview-løkken i agenten.
+	#
+	# @preview header_regexp pr Host ^api-pr-(\d+)\.
+	# handle @preview {
+	# 	reverse_proxy maanslogen-api-pr-{http.regexp.pr.1}:4000 {
+	# 		fail_duration 5s
+	# 	}
+	# }
 
 	# GitHub-webhooks. Modtageren kører på værten og ikke i en container,
 	# fordi den skal kunne starte agenten — derfor host.docker.internal.

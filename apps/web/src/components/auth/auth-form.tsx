@@ -22,6 +22,14 @@ export function AuthForm({ mode, returnTo }: { mode: "login" | "register"; retur
 
   function set(field: keyof typeof values, value: string) {
     setValues((current) => ({ ...current, [field]: value }));
+    // Feltets fejl hører til den værdi der fejlede. Uden det her blev den røde
+    // kant og teksten stående mens man rettede, helt indtil man indsendte igen.
+    setErrors((current) => {
+      if (!(field in current)) return current;
+      const next = { ...current };
+      delete next[field];
+      return next;
+    });
   }
 
   async function submit(event: React.FormEvent) {

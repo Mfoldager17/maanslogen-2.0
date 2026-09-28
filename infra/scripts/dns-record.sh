@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 #
+# PARKERET sammen med .github/workflows/preview.yml.parkeret: det fælles
+# dev-miljø bruger api.dev.<domæne>, som Terraform allerede opretter.
+#
 # Opretter og fjerner det proxy'ede CNAME der peger et preview-værtsnavn ind i
 # tunnelen. Kaldes af workflows.
 #

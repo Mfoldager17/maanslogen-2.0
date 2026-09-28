@@ -41,7 +41,7 @@ export default async function ReviewPage({ params }: { params: Promise<{ slug: s
           <p className="mb-6 mt-1 text-sm text-ink-muted">
             Spørgsmålene herunder er hentet for{" "}
             <strong className="font-semibold text-ink">
-              {beverage.category?.name} › {beverage.type?.name}
+              {[beverage.category?.name, beverage.type?.name].filter(Boolean).join(" › ")}
             </strong>{" "}
             — en anden type ville give andre.
           </p>
@@ -50,7 +50,7 @@ export default async function ReviewPage({ params }: { params: Promise<{ slug: s
         </div>
 
         <aside className="flex h-fit flex-col gap-4 lg:sticky lg:top-24">
-          <div className="rounded-[var(--radius-card)] border border-line bg-surface p-4">
+          <div className="rounded-[var(--radius-card)] border border-line bg-surface px-5 py-4">
             <MediaImage
               media={beverage.media}
               alt={beverage.name}
@@ -59,8 +59,8 @@ export default async function ReviewPage({ params }: { params: Promise<{ slug: s
               className="mb-3 aspect-[4/3] w-full rounded-[var(--radius-control)]"
               sizes="18rem"
             />
-            <p className="text-xs text-ink-muted">
-              {beverage.brand?.name} · {beverage.type?.name}
+            <p className="truncate text-xs text-ink-muted">
+              {[beverage.brand?.name, beverage.type?.name].filter(Boolean).join(" · ")}
             </p>
             <p className="font-display text-lg font-semibold leading-snug">{beverage.name}</p>
             {beverage.attributes.length > 0 ? (
@@ -75,7 +75,7 @@ export default async function ReviewPage({ params }: { params: Promise<{ slug: s
             ) : null}
           </div>
 
-          <div className="rounded-[var(--radius-card)] border border-line-strong bg-sunken p-4">
+          <div className="rounded-[var(--radius-card)] border border-line-strong bg-sunken px-5 py-4">
             <p className="mb-1.5 text-sm font-bold text-accent-hover">
               Hvorfor lige disse spørgsmål?
             </p>

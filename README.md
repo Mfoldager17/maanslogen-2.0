@@ -129,20 +129,20 @@ side.
 
 1.0 havde en god idé og en implementering der ikke bar den. Det væsentlige:
 
-|                      | 1.0                                                                                                   | 2.0                                                                                                           |
-| -------------------- | ----------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| **Autentificering**  | Fandtes ikke. Hele admin-API'et lå åbent.                                                             | argon2id, JWT med tokenVersion-tjek, rullende refresh-tokens med tyveridetektion, rollestyring                |
-| **Validering**       | DTO'er med class-validator, men `ValidationPipe` blev aldrig registreret — intet input blev valideret | Zod-skemaer delt med frontend, håndhævet på hvert kald                                                        |
-| **Filtrering**       | Alle drikkevarer blev hentet og filtreret i browseren                                                 | Filtrering, søgning, sortering og facettællinger i databasen                                                  |
-| **Paginering**       | Ingen                                                                                                 | Cursor-paginering hele vejen igennem                                                                          |
-| **Fejl**             | Tre forskellige formater afhængigt af hvor fejlen opstod                                              | RFC 9457 Problem Details, ét format                                                                           |
-| **Typer i frontend** | Genereret klient checket ind i repoet, drev fra API'et, nogle endpoints håndkodet udenom              | Typerne udledes af de delte skemaer; ingen kodegenerering                                                     |
-| **Bedømmelser**      | Gennemsnittet blev justeret ad hoc og kunne drive fra anmeldelserne                                   | Genberegnes fra rækkerne i samme transaktion                                                                  |
-| **Objektlager**      | Selvhostet MinIO. Et cron-job listede alle buckets og slettede de tomme                               | Cloudflare R2 i produktion, LocalStack lokalt, samme kode. Oprydning rører kun nøgler API'et selv har udstedt |
-| **Kategori-ikoner**  | Gemt som en `Image`-række med emojien i `url`-feltet                                                  | Et `icon`-felt                                                                                                |
-| **Billeder**         | Hver størrelse var en løsrevet række uden sammenhæng                                                  | `MediaAsset` med `MediaRendition`-varianter og alt-tekst                                                      |
-| **Controllere**      | Parallelle `admin/`- og `web/`-controllere med hver sit DTO-sæt for samme data                        | Ét sæt endpoints; læsning offentlig, skrivning rollebeskyttet                                                 |
-| **Test**             | Ingen                                                                                                 | 132: kontrakter, unit og e2e mod en rigtig Postgres                                                           |
+|                      | 1.0                                                                                                   | 2.0                                                                                                       |
+| -------------------- | ----------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| **Autentificering**  | Fandtes ikke. Hele admin-API'et lå åbent.                                                             | argon2id, JWT med tokenVersion-tjek, rullende refresh-tokens med tyveridetektion, rollestyring            |
+| **Validering**       | DTO'er med class-validator, men `ValidationPipe` blev aldrig registreret — intet input blev valideret | Zod-skemaer delt med frontend, håndhævet på hvert kald                                                    |
+| **Filtrering**       | Alle drikkevarer blev hentet og filtreret i browseren                                                 | Filtrering, søgning, sortering og facettællinger i databasen                                              |
+| **Paginering**       | Ingen                                                                                                 | Cursor-paginering hele vejen igennem                                                                      |
+| **Fejl**             | Tre forskellige formater afhængigt af hvor fejlen opstod                                              | RFC 9457 Problem Details, ét format                                                                       |
+| **Typer i frontend** | Genereret klient checket ind i repoet, drev fra API'et, nogle endpoints håndkodet udenom              | Typerne udledes af de delte skemaer; ingen kodegenerering                                                 |
+| **Bedømmelser**      | Gennemsnittet blev justeret ad hoc og kunne drive fra anmeldelserne                                   | Genberegnes fra rækkerne i samme transaktion                                                              |
+| **Objektlager**      | Selvhostet MinIO. Et cron-job listede alle buckets og slettede de tomme                               | Cloudflare R2 i produktion, Alarik lokalt, samme kode. Oprydning rører kun nøgler API'et selv har udstedt |
+| **Kategori-ikoner**  | Gemt som en `Image`-række med emojien i `url`-feltet                                                  | Et `icon`-felt                                                                                            |
+| **Billeder**         | Hver størrelse var en løsrevet række uden sammenhæng                                                  | `MediaAsset` med `MediaRendition`-varianter og alt-tekst                                                  |
+| **Controllere**      | Parallelle `admin/`- og `web/`-controllere med hver sit DTO-sæt for samme data                        | Ét sæt endpoints; læsning offentlig, skrivning rollebeskyttet                                             |
+| **Test**             | Ingen                                                                                                 | 132: kontrakter, unit og e2e mod en rigtig Postgres                                                       |
 
 > Det fulde regnskab: [`docs/architecture.md`](docs/architecture.md)
 
@@ -209,7 +209,7 @@ PR, alle mod den samme dev-database med testdata.
 
 ```bash
 # Web til Workers
-cd apps/web && NEXT_PUBLIC_API_URL=https://api.maanslogen.dk pnpm cf:deploy
+cd apps/web && NEXT_PUBLIC_API_URL=https://api-maanslogen.mathiasfoldager.com pnpm cf:deploy
 
 # API'et som image
 docker build -f apps/api/Dockerfile -t maanslogen-api .
@@ -233,6 +233,6 @@ Det der kommer og går pr. PR gør ikke, og hvorfor står samme sted.
 | [`docs/architecture.md`](docs/architecture.md)       | Valgene bag API'et og frontend, og hvad de erstatter    |
 | [`docs/domain-model.md`](docs/domain-model.md)       | Datamodellen, felt for felt, og reglerne bag            |
 | [`docs/api.md`](docs/api.md)                         | Endpoints, paginering, filtrering og fejlformat         |
-| [`docs/environments.md`](docs/environments.md)       | Dev og produktion, PR-previews og opsætningen af det    |
+| [`docs/environments.md`](docs/environments.md)       | Dev og produktion, `dev`-label'en og opsætningen af det |
 | [`docs/deployment.md`](docs/deployment.md)           | Cloudflare R2, miljøvariabler og udrulning              |
 | [`docs/r2-omkostninger.md`](docs/r2-omkostninger.md) | Hvordan R2-forbruget holdes inden for det gratis niveau |

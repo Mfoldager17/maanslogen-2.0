@@ -96,7 +96,7 @@ export function QuestionPanel({
             ? "Alle kategorier"
             : question.categoryIds.map((id) => categoryName.get(id) ?? "?").join(", "),
         meta: (
-          <span className="flex items-center gap-1.5">
+          <span className="flex shrink-0 items-center gap-1.5 whitespace-nowrap">
             {question.required ? <Badge tone="accent">Påkrævet</Badge> : null}
             <Badge>{ANSWER_LABELS[question.answerType]}</Badge>
           </span>

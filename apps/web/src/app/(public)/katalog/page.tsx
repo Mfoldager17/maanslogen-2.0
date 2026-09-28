@@ -6,6 +6,7 @@ import { FilterSidebar } from "@/components/catalog/filter-sidebar";
 import { ActiveFilters } from "@/components/catalog/active-filters";
 import { SortSelect } from "@/components/catalog/sort-select";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Panel } from "@/components/ui/panel";
 import { attributeParams, first, type SearchParams } from "@/lib/query-state";
 import { formatCount } from "@/lib/format";
 
@@ -50,21 +51,32 @@ export default async function CatalogPage({
   )?.label;
   // Facetterne kender allerede navnet bag hver slug; chippen skal ikke
   // hente det en gang til.
-  const typeLabels = Object.fromEntries(
-    facets.types.map((bucket) => [bucket.value, bucket.label]),
+  const typeLabels = Object.fromEntries(facets.types.map((bucket) => [bucket.value, bucket.label]));
+  const brandLabels = Object.fromEntries(
+    facets.brands.map((bucket) => [bucket.value, bucket.label]),
   );
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
+      {/*
+       * Sidehovedet er en aflæsning af den forespørgsel man står i: hvad der
+       * ses på, hvor mange der er, og hvordan der sorteres.
+       */}
       <div className="mb-5 flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="font-display text-3xl font-semibold tracking-tight">
+        <div className="min-w-0">
+          <p className="label-mono text-accent">Katalog</p>
+          <h1 className="mt-1.5 break-words font-display text-3xl font-bold tracking-tight">
             {categoryLabel ?? "Katalog"}
           </h1>
-          <p className="mt-1 text-sm text-ink-muted">
-            {page.pageInfo.total === null
-              ? "Drikkevarer"
-              : `${formatCount(page.pageInfo.total)} drikkevarer`}
+          <p className="mt-1 font-mono text-xs text-ink-muted">
+            {page.pageInfo.total === null ? (
+              "drikkevarer"
+            ) : (
+              <>
+                <span className="tabular text-ink-soft">{formatCount(page.pageInfo.total)}</span>{" "}
+                {page.pageInfo.total === 1 ? "drikkevare" : "drikkevarer"}
+              </>
+            )}
           </p>
         </div>
         <SortSelect />
@@ -75,11 +87,20 @@ export default async function CatalogPage({
           filterable={filterable}
           categoryLabel={categoryLabel}
           typeLabels={typeLabels}
+          brandLabels={brandLabels}
         />
       </div>
 
       <div className="grid gap-8 lg:grid-cols-[17rem_1fr]">
-        <FilterSidebar facets={facets} filterable={filterable} />
+        <Panel
+          title="Filtre"
+          tone="signal"
+          marks={false}
+          className="self-start"
+          bodyClassName="px-4 py-4"
+        >
+          <FilterSidebar facets={facets} filterable={filterable} />
+        </Panel>
 
         <div>
           {page.items.length === 0 ? (

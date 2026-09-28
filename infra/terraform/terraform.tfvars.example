@@ -6,7 +6,10 @@
 
 account_id = "<konto-id fra dashboardets højre side>"
 zone_id    = "<zone-id fra domænets oversigt>"
-domain     = "maanslogen.dk"
 
-# Udelades, og så bliver det dev.<domain>.
-# dev_domain = "dev.maanslogen.dk"
+# Zonen, ikke projektets eget domæne. Alle navne bliver bygget som
+# <rolle>-<projekt>.<domain> — fx api-dev-maanslogen.mathiasfoldager.com.
+domain = "mathiasfoldager.com"
+
+# Udelades, og så bliver det "maanslogen".
+# projekt = "maanslogen"

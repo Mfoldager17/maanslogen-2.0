@@ -3,8 +3,8 @@ import type { User } from "@maanslogen/contracts";
 import { roleAtLeast } from "@maanslogen/contracts";
 import { Logo } from "./logo";
 import { ThemeToggle } from "./theme-toggle";
-import { SearchField } from "./search-field";
 import { UserMenu } from "./user-menu";
+import { CommandPalette } from "./command-palette";
 import { Button } from "@/components/ui/button";
 
 const NAV = [
@@ -14,13 +14,14 @@ const NAV = [
   { href: "/anmeldelser", label: "Anmeldelser" },
 ] as const;
 
+/** Søgefeltet er væk; ⌘K gør både det og springer rundt. */
 export function SiteHeader({ user }: { user: User | null }) {
   return (
     <header className="sticky top-0 z-40 border-b border-line bg-canvas/85 backdrop-blur-md">
-      <div className="mx-auto flex h-16 max-w-7xl items-center gap-4 px-4 sm:gap-8 sm:px-6">
+      <div className="mx-auto flex h-14 max-w-7xl items-center gap-4 px-4 sm:gap-7 sm:px-6">
         <Logo />
 
-        <nav aria-label="Hovedmenu" className="hidden items-center gap-6 md:flex">
+        <nav aria-label="Hovedmenu" className="hidden items-center gap-5 md:flex">
           {NAV.map((item) => (
             <Link
               key={item.href}
@@ -32,21 +33,21 @@ export function SiteHeader({ user }: { user: User | null }) {
           ))}
         </nav>
 
-        <div className="ml-auto flex items-center gap-2">
-          <SearchField className="hidden w-56 sm:block lg:w-64" />
+        <div className="ml-auto flex items-center gap-1.5">
+          <CommandPalette />
           <ThemeToggle />
 
           {user ? (
             <>
               {roleAtLeast(user.role, "MODERATOR") ? (
-                <Button asChild variant="secondary" size="sm" className="hidden sm:inline-flex">
+                <Button asChild variant="secondary" size="md" className="hidden sm:inline-flex">
                   <Link href="/admin">Admin</Link>
                 </Button>
               ) : null}
               <UserMenu user={user} />
             </>
           ) : (
-            <Button asChild variant="secondary" size="sm">
+            <Button asChild variant="secondary" size="md">
               <Link href="/log-ind">Log ind</Link>
             </Button>
           )}
@@ -55,7 +56,7 @@ export function SiteHeader({ user }: { user: User | null }) {
 
       <nav
         aria-label="Hovedmenu, mobil"
-        className="flex gap-5 overflow-x-auto border-t border-line px-4 py-2 md:hidden"
+        className="flex gap-4 overflow-x-auto border-t border-line px-4 py-2 md:hidden"
       >
         {NAV.map((item) => (
           <Link

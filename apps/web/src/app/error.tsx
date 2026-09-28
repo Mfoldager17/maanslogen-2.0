@@ -18,7 +18,7 @@ export default function GlobalError({
   return (
     <main className="mx-auto flex min-h-dvh max-w-lg flex-col items-center justify-center gap-5 px-6 text-center">
       <h1 className="font-display text-3xl font-semibold">Noget gik galt</h1>
-      <Alert tone="danger" title="Fejlen er logget">
+      <Alert tone="danger" title="Fejlen er logget" className="text-left">
         {error.digest ? `Reference: ${error.digest}` : "Prøv igen om lidt."}
       </Alert>
       <Button onClick={reset}>Prøv igen</Button>

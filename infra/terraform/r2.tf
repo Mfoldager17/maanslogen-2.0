@@ -13,3 +13,15 @@ resource "cloudflare_r2_bucket" "media_dev" {
   name       = "maanslogen-media-dev"
   location   = "WEUR"
 }
+
+# Backupperne. Aldrig offentlig — der er ingen custom domain på denne, og der
+# skal ikke sættes en offentlig læsepolitik på den.
+#
+# Den har sin egen R2-token, adskilt fra den API'et bruger til billeder. Kan
+# nøglen der uploader billeder også slette dumps, er backuppen ikke beskyttet
+# mod det den er der for at overleve.
+resource "cloudflare_r2_bucket" "backup" {
+  account_id = var.account_id
+  name       = "maanslogen-backup"
+  location   = "WEUR"
+}
