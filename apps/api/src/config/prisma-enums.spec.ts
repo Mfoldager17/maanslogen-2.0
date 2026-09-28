@@ -25,8 +25,9 @@ const SCHEMA = readFileSync(join(__dirname, '../../prisma/schema.prisma'), 'utf8
 
 function prismaEnumValues(name: string): string[] {
   const match = new RegExp(`enum\\s+${name}\\s*\\{([^}]*)\\}`, 'm').exec(SCHEMA);
-  if (!match) throw new Error(`Fandt ikke enum ${name} i schema.prisma`);
-  return match[1]
+  const krop = match?.[1];
+  if (krop === undefined) throw new Error(`Fandt ikke enum ${name} i schema.prisma`);
+  return krop
     .split('\n')
     .map((line) => line.replace(/\/\/.*$/, '').trim())
     .filter((line) => line.length > 0 && !line.startsWith('@@'));

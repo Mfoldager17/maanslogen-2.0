@@ -43,6 +43,18 @@ async function opretArrangement(kind = 'FESTIVAL', title = 'Ginfestival i Øksne
   return response.json<{ id: string; slug: string; attendees: { userId: string }[] }>();
 }
 
+/**
+ * `noUncheckedIndexedAccess` gør `items[0]` til `T | undefined`. Kaster frem
+ * for at bruge `!`, så en tom liste fejler med hvad der gik galt i stedet for
+ * et TypeError et par linjer nede.
+ */
+function foersteTing<T>(ting: T[]): T {
+  const [foerste] = ting;
+  if (foerste === undefined)
+    throw new Error('Forventede mindst én ting på listen, men der var ingen');
+  return foerste;
+}
+
 async function inviter(id: string, user: AuthedUser) {
   const response = await harness.request({
     method: 'POST',
@@ -136,8 +148,9 @@ describe('Arrangementer — ting på listen', () => {
 
     expect(response.statusCode).toBe(201);
     const body = response.json<{ items: { displayName: string; beverage: unknown }[] }>();
-    expect(body.items[0].displayName).toBe('Nordisk Gin, batch 4');
-    expect(body.items[0].beverage).toBeNull();
+    const post = foersteTing(body.items);
+    expect(post.displayName).toBe('Nordisk Gin, batch 4');
+    expect(post.beverage).toBeNull();
   });
 
   it('afviser en post uden både drikkevare og navn', async () => {
@@ -211,7 +224,7 @@ describe('Arrangementer — noter', () => {
       payload: { status: 'LIVE' },
     });
     const body = live.json<{ items: { id: string }[] }>();
-    return { arrangement, itemId: body.items[0].id };
+    return { arrangement, itemId: foersteTing(body.items).id };
   }
 
   it('gemmer deltagerens note og markerer at vedkommende var med', async () => {
@@ -229,8 +242,9 @@ describe('Arrangementer — noter', () => {
       items: { averageRating: number | null; notes: { rating: number }[] }[];
       attendees: { userId: string; joinedAt: string | null }[];
     }>();
-    expect(body.items[0].notes).toHaveLength(1);
-    expect(body.items[0].averageRating).toBe(4.5);
+    const post = foersteTing(body.items);
+    expect(post.notes).toHaveLength(1);
+    expect(post.averageRating).toBe(4.5);
     // joinedAt sættes ved første note — det er sådan "var med" adskiller sig
     // fra "blev inviteret, men kom ikke".
     expect(body.attendees.find((a) => a.userId === deltager.id)?.joinedAt).not.toBeNull();
@@ -258,7 +272,7 @@ describe('Arrangementer — noter', () => {
       headers: admin.headers,
       payload: { label: 'For tidligt' },
     });
-    const itemId = tilfoej.json<{ items: { id: string }[] }>().items[0].id;
+    const itemId = foersteTing(tilfoej.json<{ items: { id: string }[] }>().items).id;
 
     const response = await harness.request({
       method: 'PUT',
