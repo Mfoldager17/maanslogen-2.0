@@ -21,9 +21,15 @@ datasource db {
   provider = "postgresql"
 }
 
-/* ------------------------------------------------------------------ */
-/* Enums                                                               */
-/* ------------------------------------------------------------------ */
+/**
+ * ------------------------------------------------------------------
+ */
+/**
+ * Enums
+ */
+/**
+ * ------------------------------------------------------------------
+ */
 
 enum Role {
   USER
@@ -55,6 +61,20 @@ enum MediaVariant {
   AVATAR
 }
 
+enum GatheringKind {
+  TASTING
+  FESTIVAL
+  VISIT
+  DINNER
+  OTHER
+}
+
+enum GatheringStatus {
+  PLANNED
+  LIVE
+  DONE
+}
+
 enum MediaOwnerType {
   BEVERAGE
   BRAND
@@ -62,9 +82,15 @@ enum MediaOwnerType {
   USER
 }
 
-/* ------------------------------------------------------------------ */
-/* Brugere og autentificering                                          */
-/* ------------------------------------------------------------------ */
+/**
+ * ------------------------------------------------------------------
+ */
+/**
+ * Brugere og autentificering
+ */
+/**
+ * ------------------------------------------------------------------
+ */
 
 model User {
   id           String    @id @default(uuid()) @db.Uuid
@@ -85,6 +111,9 @@ model User {
   reviews       Review[]
   refreshTokens RefreshToken[]
 
+  hostedGatherings    Gathering[]
+  gatheringAttendance GatheringAttendee[]
+
   @@index([role])
   @@index([deletedAt])
   @@map("users")
@@ -92,18 +121,18 @@ model User {
 
 /// Rullende refresh-tokens. Kun hashen gemmes; en genbrugt token invaliderer hele familien.
 model RefreshToken {
-  id         String    @id @default(uuid()) @db.Uuid
-  userId     String    @map("user_id") @db.Uuid
-  tokenHash  String    @unique @map("token_hash")
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  tokenHash String    @unique @map("token_hash")
   /// Alle tokens udstedt fra samme login deler family-id.
-  familyId   String    @map("family_id") @db.Uuid
-  expiresAt  DateTime  @map("expires_at")
-  revokedAt  DateTime? @map("revoked_at")
+  familyId  String    @map("family_id") @db.Uuid
+  expiresAt DateTime  @map("expires_at")
+  revokedAt DateTime? @map("revoked_at")
   /// Sat når tokenet er byttet til et nyt — gør genbrug detekterbart.
-  rotatedAt  DateTime? @map("rotated_at")
-  userAgent  String?   @map("user_agent")
-  ipAddress  String?   @map("ip_address")
-  createdAt  DateTime  @default(now()) @map("created_at")
+  rotatedAt DateTime? @map("rotated_at")
+  userAgent String?   @map("user_agent")
+  ipAddress String?   @map("ip_address")
+  createdAt DateTime  @default(now()) @map("created_at")
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -113,9 +142,15 @@ model RefreshToken {
   @@map("refresh_tokens")
 }
 
-/* ------------------------------------------------------------------ */
-/* Medier                                                              */
-/* ------------------------------------------------------------------ */
+/**
+ * ------------------------------------------------------------------
+ */
+/**
+ * Medier
+ */
+/**
+ * ------------------------------------------------------------------
+ */
 
 /// Ét logisk billede. Renditions er de konkrete filer i objektlageret (R2).
 model MediaAsset {
@@ -169,9 +204,15 @@ model PendingUpload {
   @@map("pending_uploads")
 }
 
-/* ------------------------------------------------------------------ */
-/* Katalog                                                             */
-/* ------------------------------------------------------------------ */
+/**
+ * ------------------------------------------------------------------
+ */
+/**
+ * Katalog
+ */
+/**
+ * ------------------------------------------------------------------
+ */
 
 model BeverageCategory {
   id          String    @id @default(uuid()) @db.Uuid
@@ -260,8 +301,8 @@ model Beverage {
   updatedAt   DateTime  @updatedAt @map("updated_at")
   deletedAt   DateTime? @map("deleted_at")
 
-  typeId  String @map("type_id") @db.Uuid
-  brandId String @map("brand_id") @db.Uuid
+  typeId  String  @map("type_id") @db.Uuid
+  brandId String  @map("brand_id") @db.Uuid
   mediaId String? @map("media_id") @db.Uuid
 
   type  BeverageType @relation(fields: [typeId], references: [id], onDelete: Restrict)
@@ -277,6 +318,7 @@ model Beverage {
 
   attributeValues BeverageAttributeValue[]
   reviews         Review[]
+  gatheringItems  GatheringItem[]
 
   @@unique([brandId, name, vintage])
   @@index([typeId, active])
@@ -287,9 +329,15 @@ model Beverage {
   @@map("beverages")
 }
 
-/* ------------------------------------------------------------------ */
-/* Dynamiske attributter                                               */
-/* ------------------------------------------------------------------ */
+/**
+ * ------------------------------------------------------------------
+ */
+/**
+ * Dynamiske attributter
+ */
+/**
+ * ------------------------------------------------------------------
+ */
 
 model AttributeDefinition {
   id          String            @id @default(uuid()) @db.Uuid
@@ -350,9 +398,15 @@ model BeverageAttributeValue {
   @@map("beverage_attribute_values")
 }
 
-/* ------------------------------------------------------------------ */
-/* Spørgsmål og anmeldelser                                            */
-/* ------------------------------------------------------------------ */
+/**
+ * ------------------------------------------------------------------
+ */
+/**
+ * Spørgsmål og anmeldelser
+ */
+/**
+ * ------------------------------------------------------------------
+ */
 
 model Question {
   id         String             @id @default(uuid()) @db.Uuid
@@ -392,8 +446,8 @@ model Review {
   updatedAt  DateTime  @updatedAt @map("updated_at")
   deletedAt  DateTime? @map("deleted_at")
 
-  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  beverage Beverage @relation(fields: [beverageId], references: [id], onDelete: Cascade)
+  user     User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  beverage Beverage       @relation(fields: [beverageId], references: [id], onDelete: Cascade)
   answers  ReviewAnswer[]
 
   @@unique([userId, beverageId])
@@ -404,16 +458,16 @@ model Review {
 }
 
 model ReviewAnswer {
-  id         String   @id @default(uuid()) @db.Uuid
-  reviewId   String   @map("review_id") @db.Uuid
-  questionId String   @map("question_id") @db.Uuid
+  id           String   @id @default(uuid()) @db.Uuid
+  reviewId     String   @map("review_id") @db.Uuid
+  questionId   String   @map("question_id") @db.Uuid
   /// Som ved attributværdier: typen bestemmes af spørgsmålets answerType.
   valueText    String?  @map("value_text")
   valueNumber  Float?   @map("value_number")
   valueBoolean Boolean? @map("value_boolean")
   valueJson    Json?    @map("value_json")
-  createdAt  DateTime @default(now()) @map("created_at")
-  updatedAt  DateTime @updatedAt @map("updated_at")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
 
   review   Review   @relation(fields: [reviewId], references: [id], onDelete: Cascade)
   question Question @relation(fields: [questionId], references: [id], onDelete: Restrict)
@@ -422,4 +476,123 @@ model ReviewAnswer {
   @@index([reviewId])
   @@index([questionId])
   @@map("review_answers")
+}
+
+// ---------------------------------------------------------------------------
+// Arrangementer
+//
+// En anledning: logen mødtes, drak nogle ting, og skrev ned hvad de syntes.
+// Bagefter bliver det til et opslag man kan gå tilbage til.
+//
+// Noterne herinde er med vilje ikke Review. En anmeldelse er din stående dom om
+// en drikkevare — Review har @@unique([userId, beverageId]), så du kan kun have
+// én. En note er hvad du syntes dén aften. Smager I det samme et år senere,
+// skal begge dele kunne stå, og det gamle må ikke blive overskrevet.
+// ---------------------------------------------------------------------------
+
+model Gathering {
+  id     String          @id @default(uuid()) @db.Uuid
+  slug   String          @unique
+  kind   GatheringKind
+  status GatheringStatus @default(PLANNED)
+
+  title    String
+  summary  String?
+  /// Opslagets brødtekst. Skrives efter arrangementet.
+  story    String?
+  heldAt   DateTime? @map("held_at")
+  location String?
+
+  hostId String @map("host_id") @db.Uuid
+
+  /// Sat = opslaget er skrevet færdigt og udsendt til deltagerne. Låser samtidig
+  /// noterne: uden det ville "hvad vi syntes den aften" kunne skrives om bagefter.
+  publishedAt DateTime? @map("published_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  host      User                @relation(fields: [hostId], references: [id], onDelete: Restrict)
+  items     GatheringItem[]
+  attendees GatheringAttendee[]
+
+  @@index([status, heldAt(sort: Desc)])
+  @@index([hostId])
+  @@map("gatherings")
+}
+
+/// Én ting der blev drukket. Ved en smagning planlagt i forvejen og skænket i
+/// rækkefølge; ved en festival skrevet ind i det øjeblik nogen rækker dig et glas.
+model GatheringItem {
+  id          String @id @default(uuid()) @db.Uuid
+  gatheringId String @map("gathering_id") @db.Uuid
+
+  /// Null indtil posten er knyttet til kataloget. Til en festival smager man ting
+  /// der ikke findes i Maanslogen endnu, og skal man oprette drikkevaren først,
+  /// bliver det ikke skrevet ned overhovedet.
+  beverageId String? @map("beverage_id") @db.Uuid
+  /// Navnet som det stod på skiltet. Bruges når beverageId mangler.
+  label      String?
+
+  sortOrder Int       @map("sort_order")
+  blind     Boolean   @default(false)
+  /// Hvornår den blev skænket. Giver opslaget en tidslinje gratis.
+  servedAt  DateTime? @map("served_at")
+  note      String?
+  addedById String?   @map("added_by_id") @db.Uuid
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  gathering Gathering       @relation(fields: [gatheringId], references: [id], onDelete: Cascade)
+  beverage  Beverage?       @relation(fields: [beverageId], references: [id], onDelete: SetNull)
+  notes     GatheringNote[]
+
+  @@unique([gatheringId, sortOrder])
+  @@index([gatheringId])
+  @@index([beverageId])
+  @@map("gathering_items")
+}
+
+/// Invitationen ER deltagerrækken: findes den ikke, har brugeren ingen adgang.
+/// Derfor er det også det eneste sted adgangen skal ændres, den dag man selv
+/// skal kunne melde sig til.
+model GatheringAttendee {
+  id          String @id @default(uuid()) @db.Uuid
+  gatheringId String @map("gathering_id") @db.Uuid
+  userId      String @map("user_id") @db.Uuid
+
+  invitedAt DateTime  @default(now()) @map("invited_at")
+  /// Sættes første gang deltageren skriver noget. Skelner "var med" fra
+  /// "blev inviteret, men kom ikke" — uden den ser fravær ud som tavshed.
+  joinedAt  DateTime? @map("joined_at")
+
+  gathering Gathering       @relation(fields: [gatheringId], references: [id], onDelete: Cascade)
+  user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  notes     GatheringNote[]
+
+  @@unique([gatheringId, userId])
+  @@index([userId])
+  @@map("gathering_attendees")
+}
+
+/// Hvad én deltager syntes om én servering. Bevidst kort — man står med et glas.
+model GatheringNote {
+  id         String @id @default(uuid()) @db.Uuid
+  itemId     String @map("item_id") @db.Uuid
+  attendeeId String @map("attendee_id") @db.Uuid
+
+  /// 1-5 i halve trin, som Review. Håndhæves af en CHECK-constraint i migreringen.
+  rating Float
+  body   String?
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  item     GatheringItem     @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  attendee GatheringAttendee @relation(fields: [attendeeId], references: [id], onDelete: Cascade)
+
+  @@unique([itemId, attendeeId])
+  @@index([itemId])
+  @@index([attendeeId])
+  @@map("gathering_notes")
 }
