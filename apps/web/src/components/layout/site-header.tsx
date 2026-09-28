@@ -14,15 +14,23 @@ const NAV = [
   { href: "/anmeldelser", label: "Anmeldelser" },
 ] as const;
 
+/**
+ * Arrangementer er logens eget rum, og listen er tom uden en bruger. At vise
+ * linket til alle ville love noget der ikke er der.
+ */
+const NAV_INDLOGGET = [{ href: "/arrangementer", label: "Arrangementer" }] as const;
+
 /** Søgefeltet er væk; ⌘K gør både det og springer rundt. */
 export function SiteHeader({ user }: { user: User | null }) {
+  const nav = user ? [...NAV, ...NAV_INDLOGGET] : NAV;
+
   return (
     <header className="sticky top-0 z-40 border-b border-line bg-canvas/85 backdrop-blur-md">
       <div className="mx-auto flex h-14 max-w-7xl items-center gap-4 px-4 sm:gap-7 sm:px-6">
         <Logo />
 
         <nav aria-label="Hovedmenu" className="hidden items-center gap-5 md:flex">
-          {NAV.map((item) => (
+          {nav.map((item) => (
             <Link
               key={item.href}
               href={item.href}
@@ -58,7 +66,7 @@ export function SiteHeader({ user }: { user: User | null }) {
         aria-label="Hovedmenu, mobil"
         className="flex gap-4 overflow-x-auto border-t border-line px-4 py-2 md:hidden"
       >
-        {NAV.map((item) => (
+        {nav.map((item) => (
           <Link
             key={item.href}
             href={item.href}
