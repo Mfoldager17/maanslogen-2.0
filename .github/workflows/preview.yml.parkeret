@@ -77,6 +77,8 @@ jobs:
           file: apps/api/Dockerfile
           push: true
           platforms: linux/arm64
+          # NB: skal have små bogstaver som i dev.yml — se trinnet
+          # "Imagenavnet med små bogstaver" dér. GHCR afviser ellers taggen.
           tags: ghcr.io/${{ github.repository_owner }}/maanslogen-api:pr-${{ github.event.pull_request.number }}
           cache-from: type=gha
           cache-to: type=gha,mode=max

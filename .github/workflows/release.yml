@@ -46,11 +46,14 @@ jobs:
       # den, og det er netop porten: så har commit'en aldrig været på main.
       - name: Forfrem
         env:
-          BILLEDE: ghcr.io/${{ github.repository_owner }}/maanslogen-api
           SHA: ${{ github.event.release.target_commitish }}
           MAERKAT: ${{ github.event.release.tag_name }}
         run: |
           set -euo pipefail
+
+          # GHCR kræver små bogstaver i repository-navnet, og
+          # GITHUB_REPOSITORY_OWNER er brugernavnet som det er skrevet.
+          BILLEDE="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/maanslogen-api"
 
           # target_commitish kan være et grennavn, hvis release'et blev lavet
           # ud fra en gren frem for en tag'et commit. Så er det commit'en bag
