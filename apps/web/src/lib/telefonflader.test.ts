@@ -1,4 +1,4 @@
-import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
@@ -18,10 +18,15 @@ import { describe, expect, it } from 'vitest';
  */
 const WEB = path.resolve(__dirname, '..');
 
-const MAPPER = ['components/gathering', 'app/(public)/arrangementer'];
+const MAPPER = ['components/gathering', 'app/(public)/arrangementer', 'app/(arrangement)'];
 
 function filerUnder(mappe: string): string[] {
   const rod = path.join(WEB, mappe);
+  // En mappe der ikke findes er i sig selv et fund, men den skal rapporteres
+  // af en test med en læsbar besked — ikke som en ENOENT der vælter hele filen
+  // ved import, før en eneste assertion er kørt. `finder filerne` og
+  // `ligger hvor testen tror` fanger den.
+  if (!existsSync(rod)) return [];
   return readdirSync(rod).flatMap((navn) => {
     const sti = path.join(rod, navn);
     if (statSync(sti).isDirectory()) return filerUnder(path.join(mappe, navn));
@@ -74,6 +79,63 @@ describe('arrangementsfladerne er til en telefon', () => {
       skjult,
       `${navn} skjuler noget bag hover. En telefon har ikke hover, så det ville ` +
         'være usynligt netop dér fladen skal bruges.',
+    ).toEqual([]);
+  });
+});
+
+/**
+ * Fladen skal stå for sig selv.
+ *
+ * Sidehovedet er 56px plus en mobil-navrække, og sidefoden ligger nedenunder.
+ * På en telefon er det omkring en tredjedel af skærmen brugt på at navigere
+ * *væk* fra netop den side man står og bruger — midt i en smagning, med én
+ * hånd. Lå siden i `(public)`, ville den arve begge dele.
+ *
+ * Testen går layoutkæden op fra siden, præcis som Next selv gør, frem for at
+ * kigge på én fil. Flytter nogen siden tilbage i en rutegruppe med sidehoved,
+ * samler kæden det op, og det her bliver rødt.
+ */
+describe('arrangementsfladen bærer ikke sitets ramme', () => {
+  const SIDE = 'app/(arrangement)/arrangementer/[slug]/page.tsx';
+
+  /** Alle layout.tsx fra sidens egen mappe og op til app/, som Next stabler dem. */
+  function layoutkaede(side: string): string[] {
+    const led = path.dirname(side).split('/');
+    const kaede: string[] = [];
+
+    while (led.length > 0) {
+      const kandidat = path.join(WEB, ...led, 'layout.tsx');
+      if (existsSync(kandidat)) kaede.push(path.relative(WEB, kandidat));
+      if (led[led.length - 1] === 'app') break;
+      led.pop();
+    }
+
+    return kaede;
+  }
+
+  it('ligger hvor testen tror', () => {
+    // Uden denne ville en omdøbt fil give en tom kæde, og resten ville bestå
+    // ved at kigge på ingenting.
+    expect(existsSync(path.join(WEB, SIDE)), `${SIDE} findes ikke`).toBe(true);
+  });
+
+  it('har et layout af sin egen', () => {
+    expect(layoutkaede(SIDE)).toContain('app/(arrangement)/layout.tsx');
+  });
+
+  it('samler hverken sidehoved eller sidefod op på vejen', () => {
+    const ramme = layoutkaede(SIDE).flatMap((layout) => {
+      const indhold = readFileSync(path.join(WEB, layout), 'utf8');
+      return ['SiteHeader', 'SiteFooter']
+        .filter((navn) => indhold.includes(navn))
+        .map((navn) => `${layout} trækker ${navn} ind`);
+    });
+
+    expect(
+      ramme,
+      'Arrangementsfladen skal være ren. Sidehoved og sidefod koster omkring ' +
+        'en tredjedel af en telefonskærm på navigation væk fra siden:\n' +
+        ramme.join('\n'),
     ).toEqual([]);
   });
 });

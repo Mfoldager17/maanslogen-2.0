@@ -1,13 +1,12 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { ApiError } from "@/lib/api/client";
 import { api } from "@/lib/api/api.server";
 import { getCurrentUser } from "@/lib/session";
+import { GatheringBar } from "@/components/gathering/gathering-bar";
 import { GatheringLive } from "@/components/gathering/gathering-live";
 import { GatheringPost } from "@/components/gathering/gathering-post";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { ARRANGEMENT_ETIKETTER, STATUS_ETIKETTER, STATUS_TONER } from "@/lib/arrangementer";
 import { formatDate } from "@/lib/format";
 
@@ -60,31 +59,30 @@ export default async function ArrangementPage({ params }: { params: Promise<{ sl
   const udgivet = detail.publishedAt !== null;
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
-      <Button asChild variant="ghost" size="md" className="-ml-3 mb-4">
-        <Link href="/arrangementer">Tilbage til arrangementer</Link>
-      </Button>
+    <>
+      <GatheringBar
+        titel={detail.title}
+        gatheringId={detail.viewer.isAdmin ? detail.id : undefined}
+      />
 
-      <header className="border-b border-line pb-6">
-        <div className="flex flex-wrap items-center gap-2">
+      <div className="mx-auto max-w-3xl px-4 py-5 sm:px-6">
+        {/*
+         * Alt det der før stod som en fuld sidehoved-blok med egen overskrift,
+         * resumé, metalinje og en skillelinje, ligger nu på to linjer. Titlen
+         * er i bjælken; det her er kun det man skal bruge for at vide hvor man
+         * er, og så skal listen i gang.
+         */}
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
           <Badge tone="neutral">{ARRANGEMENT_ETIKETTER[detail.kind]}</Badge>
           <Badge tone={STATUS_TONER[detail.status]}>{STATUS_ETIKETTER[detail.status]}</Badge>
-          {detail.viewer.isAdmin ? (
-            <Button asChild variant="ghost" size="md" className="ml-auto">
-              <Link href={`/admin/arrangementer/${detail.id}`}>Styr arrangementet</Link>
-            </Button>
-          ) : null}
+          <span className="flex flex-wrap gap-x-3 text-sm text-ink-muted">
+            {detail.heldAt ? <span>{formatDate(detail.heldAt)}</span> : null}
+            {detail.location ? <span>{detail.location}</span> : null}
+            <span>{detail.attendeeCount} deltagere</span>
+          </span>
         </div>
 
-        <h1 className="mt-3 font-display text-3xl font-semibold tracking-tight">{detail.title}</h1>
-
-        {detail.summary ? <p className="mt-2 text-ink-muted">{detail.summary}</p> : null}
-
-        <p className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-sm text-ink-muted">
-          {detail.heldAt ? <span>{formatDate(detail.heldAt)}</span> : null}
-          {detail.location ? <span>{detail.location}</span> : null}
-          <span>{detail.attendeeCount} deltagere</span>
-        </p>
+        {detail.summary ? <p className="mt-2 text-sm text-ink-muted">{detail.summary}</p> : null}
 
         {/*
          * Et udkast er kun synligt for admin — API'et udelader `story` for
@@ -92,19 +90,19 @@ export default async function ArrangementPage({ params }: { params: Promise<{ sl
          * "hvorfor kan jeg ikke se teksten".
          */}
         {!udgivet && detail.viewer.isAdmin && detail.story ? (
-          <p className="mt-4 rounded-[var(--radius-control)] bg-sunken px-3 py-2 text-sm text-ink-soft">
+          <p className="mt-3 rounded-[var(--radius-control)] bg-sunken px-3 py-2 text-sm text-ink-soft">
             Opslaget er skrevet, men ikke udgivet. Kun du kan se det.
           </p>
         ) : null}
-      </header>
 
-      <div className="pt-8">
-        {udgivet ? (
-          <GatheringPost detail={detail} viewerId={user.id} />
-        ) : (
-          <GatheringLive detail={detail} viewerId={user.id} />
-        )}
+        <div className="pt-5">
+          {udgivet ? (
+            <GatheringPost detail={detail} viewerId={user.id} />
+          ) : (
+            <GatheringLive detail={detail} viewerId={user.id} />
+          )}
+        </div>
       </div>
-    </div>
+    </>
   );
 }
