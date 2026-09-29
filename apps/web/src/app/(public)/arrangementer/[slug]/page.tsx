@@ -61,7 +61,7 @@ export default async function ArrangementPage({ params }: { params: Promise<{ sl
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
-      <Button asChild variant="ghost" size="sm" className="-ml-3 mb-4">
+      <Button asChild variant="ghost" size="md" className="-ml-3 mb-4">
         <Link href="/arrangementer">Tilbage til arrangementer</Link>
       </Button>
 
@@ -70,7 +70,7 @@ export default async function ArrangementPage({ params }: { params: Promise<{ sl
           <Badge tone="neutral">{ARRANGEMENT_ETIKETTER[detail.kind]}</Badge>
           <Badge tone={STATUS_TONER[detail.status]}>{STATUS_ETIKETTER[detail.status]}</Badge>
           {detail.viewer.isAdmin ? (
-            <Button asChild variant="ghost" size="sm" className="ml-auto">
+            <Button asChild variant="ghost" size="md" className="ml-auto">
               <Link href={`/admin/arrangementer/${detail.id}`}>Styr arrangementet</Link>
             </Button>
           ) : null}
