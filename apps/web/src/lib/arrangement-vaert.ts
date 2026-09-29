@@ -36,10 +36,16 @@ export interface VaertOpslag {
  * viderestille for at fjerne skråstregen, og et rewrite der bliver til en
  * omdirigering viser den indre adresse i browserens adresselinje.
  */
+export function erArrangementsVaert(
+  vaert: string | null | undefined,
+  arrangementVaert: string | null | undefined,
+): boolean {
+  if (!arrangementVaert || !vaert) return false;
+  return vaert.toLowerCase() === arrangementVaert.toLowerCase();
+}
+
 export function arrangementsSti({ vaert, pathname, arrangementVaert }: VaertOpslag): string | null {
-  if (!arrangementVaert) return null;
-  if (!vaert) return null;
-  if (vaert.toLowerCase() !== arrangementVaert.toLowerCase()) return null;
+  if (!erArrangementsVaert(vaert, arrangementVaert)) return null;
 
   if (pathname === '/arrangementer' || pathname.startsWith('/arrangementer/')) return null;
   if (DELTE_STIER.some((moenster) => moenster.test(pathname))) return null;

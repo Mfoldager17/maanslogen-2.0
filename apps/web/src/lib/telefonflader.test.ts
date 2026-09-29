@@ -18,7 +18,10 @@ import { describe, expect, it } from 'vitest';
  */
 const WEB = path.resolve(__dirname, '..');
 
-const MAPPER = ['components/gathering', 'app/(public)/arrangementer', 'app/(arrangement)'];
+// Hele arrangementsområdet ligger nu i (arrangement). Stod den gamle sti
+// stadig her, ville filerUnder svare [] for den, og dækningen ville skrumpe
+// uden at noget blev rødt.
+const MAPPER = ['components/gathering', 'app/(arrangement)'];
 
 function filerUnder(mappe: string): string[] {
   const rod = path.join(WEB, mappe);
@@ -96,7 +99,18 @@ describe('arrangementsfladerne er til en telefon', () => {
  * samler kæden det op, og det her bliver rødt.
  */
 describe('arrangementsfladen bærer ikke sitets ramme', () => {
-  const SIDE = 'app/(arrangement)/arrangementer/[slug]/page.tsx';
+  /**
+   * Begge sider, ikke kun detaljen.
+   *
+   * Første forsøg flyttede kun detaljesiden. Listen blev liggende i (public)
+   * med sidehoved og sidefod — og det er netop listen arrangementsværtens `/`
+   * peger på, så indgangen til fladen så ud som hovedsitet. Det blev opdaget
+   * ved at kigge på skærmen, ikke af en test. Nu dækker testen begge.
+   */
+  const SIDER = [
+    'app/(arrangement)/arrangementer/page.tsx',
+    'app/(arrangement)/arrangementer/[slug]/page.tsx',
+  ];
 
   /** Alle layout.tsx fra sidens egen mappe og op til app/, som Next stabler dem. */
   function layoutkaede(side: string): string[] {
@@ -113,18 +127,18 @@ describe('arrangementsfladen bærer ikke sitets ramme', () => {
     return kaede;
   }
 
-  it('ligger hvor testen tror', () => {
+  it.each(SIDER)('%s ligger hvor testen tror', (side) => {
     // Uden denne ville en omdøbt fil give en tom kæde, og resten ville bestå
     // ved at kigge på ingenting.
-    expect(existsSync(path.join(WEB, SIDE)), `${SIDE} findes ikke`).toBe(true);
+    expect(existsSync(path.join(WEB, side)), `${side} findes ikke`).toBe(true);
   });
 
-  it('har et layout af sin egen', () => {
-    expect(layoutkaede(SIDE)).toContain('app/(arrangement)/layout.tsx');
+  it.each(SIDER)('%s har et layout af sin egen', (side) => {
+    expect(layoutkaede(side)).toContain('app/(arrangement)/layout.tsx');
   });
 
-  it('samler hverken sidehoved eller sidefod op på vejen', () => {
-    const ramme = layoutkaede(SIDE).flatMap((layout) => {
+  it.each(SIDER)('%s samler hverken sidehoved eller sidefod op', (side) => {
+    const ramme = layoutkaede(side).flatMap((layout) => {
       const indhold = readFileSync(path.join(WEB, layout), 'utf8');
       return ['SiteHeader', 'SiteFooter']
         .filter((navn) => indhold.includes(navn))

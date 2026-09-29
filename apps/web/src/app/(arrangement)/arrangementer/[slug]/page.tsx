@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { ApiError } from "@/lib/api/client";
 import { api } from "@/lib/api/api.server";
 import { getCurrentUser } from "@/lib/session";
+import { paaArrangementsVaert } from "@/lib/arrangement-vaert.server";
 import { GatheringBar } from "@/components/gathering/gathering-bar";
 import { GatheringLive } from "@/components/gathering/gathering-live";
 import { GatheringPost } from "@/components/gathering/gathering-post";
@@ -57,11 +58,14 @@ export default async function ArrangementPage({ params }: { params: Promise<{ sl
   if (!detail) notFound();
 
   const udgivet = detail.publishedAt !== null;
+  // Listen er forsiden på arrangementsværten og /arrangementer på hovedværten.
+  const egenVaert = await paaArrangementsVaert();
 
   return (
     <>
       <GatheringBar
         titel={detail.title}
+        tilbage={egenVaert ? "listeRod" : "liste"}
         gatheringId={detail.viewer.isAdmin ? detail.id : undefined}
       />
 
