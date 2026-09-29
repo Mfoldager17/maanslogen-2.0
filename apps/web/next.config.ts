@@ -12,6 +12,22 @@ const nextConfig: NextConfig = {
     remotePatterns: [new URL(`${mediaOrigin}/**`), new URL('https://*.r2.dev/**')],
   },
   typedRoutes: true,
+  /**
+   * Browserens API-kald går til sidens egen vært og bliver sendt videre herfra.
+   *
+   * Formålet er cookien. Talte browseren direkte med API'et, ville sessionen
+   * blive sat host-only på API'ets vært, og sidens server kunne ikke læse den
+   * — `middleware.ts` og `lib/api/server.ts` læser cookies fra sidens
+   * forespørgsel. Med rewritet kommer `Set-Cookie` tilbage på netop den vært
+   * browseren talte med, så hver vært har sin egen session uden en cookie der
+   * gælder hele domænet.
+   *
+   * Der kommer ingen API-logik ind i frontenden af det her. Next videresender
+   * forespørgslen uændret; al behandling sker stadig i API'et.
+   */
+  async rewrites() {
+    return [{ source: '/api/v1/:path*', destination: `${apiOrigin}/api/v1/:path*` }];
+  },
   async headers() {
     return [
       {

@@ -125,23 +125,57 @@ docker build -f apps/web/Dockerfile \
 
 ## Cookies på tværs af værter
 
-`COOKIE_DOMAIN` udelades normalt, og det er med vilje.
+`COOKIE_DOMAIN` udelades, og det er med vilje. Men det virker kun fordi
+browseren aldrig taler direkte med API'et.
 
-Refresh-cookien sættes af API'et og læses kun af API'et. Uden `COOKIE_DOMAIN`
-bliver den _host-only_: bundet til `api-maanslogen.mathiasfoldager.com` og
-sendt ingen andre steder hen. Det er alt hvad der skal til, fordi browseren
-sender den med på de kald sitet laver til API'et — i produktion sættes
-cookien automatisk med `Secure` og `SameSite=None`, som netop tillader det på
-tværs af værter. Det kræver HTTPS begge steder.
+### Hvorfor browserens kald går gennem sitet
 
-`COOKIE_DOMAIN` giver kun mening hvis cookien skal deles med _andre_ værter,
-og så skal den sættes til en forælder de deler. Her ville det være hele
-`mathiasfoldager.com`, og så fulgte refresh-tokenet med til alt andet på det
-domæne. Derfor ikke.
+En tidligere udgave af det her afsnit påstod at cookien "sættes af API'et og
+læses kun af API'et". Det er forkert, og fejlen er værd at kende: både
+`middleware.ts` og `lib/api/server.ts` læser sessionen fra **sitets**
+forespørgsel, ikke API'ets. Satte API'et cookien host-only på sin egen vært,
+ville sitets server aldrig se den — man ville logge ind og blive sendt til
+login igen, i ring.
 
-Den dag API og site ligger under samme projekt-domæne — `api.maanslogen.com`
-og `maanslogen.com` — kan `COOKIE_DOMAIN=.maanslogen.com` sættes, hvis der
-opstår et behov for at dele.
+Det ses ikke lokalt, fordi cookies ikke skelner på portnummer:
+`localhost:3000` og `localhost:4000` er samme vært.
+
+Derfor kalder browseren `/api/v1/...` på **sitets egen vært**, og
+`next.config.ts` sender kaldet videre til API'et serverside. `Set-Cookie`
+kommer så tilbage på den vært browseren faktisk talte med, og sitets server kan
+læse den. Der kommer ingen API-logik ind i frontenden af det: Next
+videresender forespørgslen uændret.
+
+Serverside kald går stadig direkte til API'et. De har ingen oprindelse at være
+relative til, og de sender cookien med i hånden.
+
+`samme-oprindelse.test.ts` holder de to ender i sync — et rewrite der ikke
+dækker det præfiks browseren kalder, ville ellers give 404 på hvert eneste
+API-kald.
+
+### Hvad det betyder for sessioner
+
+Hver vært har sin egen session. Logger man ind på `maanslogen.…`, er man ikke
+logget ind på et eventuelt `arrangement-maanslogen.…` — det er to adskilte
+cookies, hver host-only på sin vært. For en installeret PWA er det knap nok
+mærkbart: man logger ind én gang, og refresh-tokenet lever en måned.
+
+Til gengæld når ingen cookie nogensinde ud over den vært den blev sat på.
+
+### Den dag der er et projekt-domæne
+
+`COOKIE_DOMAIN` er knappen der skifter til delte sessioner. Sat til en fælles
+forælder gælder cookien for alle værter under den.
+
+Den er ikke sat til `mathiasfoldager.com` i dag, netop fordi den så også ville
+nå alt andet der bor på det domæne. Ligger site og API en dag under
+`maanslogen.com`, kan `COOKIE_DOMAIN=maanslogen.com` sættes uden den
+indvending — det er én miljøvariabel, ingen kodeændring.
+
+Sættes den, tjekker `env.ts` ved opstart at hver adresse i `CORS_ORIGINS`
+ligger under domænet. En cookie for ét domæne når aldrig et site på et andet,
+og den fejl viser sig ikke som en fejl, men som en bruger der bliver ved med
+at blive sendt til login.
 
 ---
 
