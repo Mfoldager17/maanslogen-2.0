@@ -45,7 +45,11 @@ export async function createApp(): Promise<NestFastifyApplication> {
   app.enableCors({
     origin: config.CORS_ORIGINS.length > 0 ? config.CORS_ORIGINS : false,
     credentials: true,
-    methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
+    // Skal dække hver metode webklienten kan sende (ApiRequest i
+    // apps/web/src/lib/api/client.ts). Mangler en, blokerer browseren kaldet i
+    // preflight, og fejlen når aldrig frem som et HTTP-svar — den ser ud som
+    // om serveren er nede. Holdes i sync af cors-metoder.spec.ts.
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     maxAge: 86_400,
   });
 
