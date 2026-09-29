@@ -8,6 +8,17 @@ dist/
 out/
 *.tsbuildinfo
 
+# Genereres af `next dev` og `next build` — og de to skriver ikke det samme:
+# dev peger importerne på .next/dev/types/, build på .next/types/. Filen blev
+# derfor ændret hver gang man skiftede mellem de to, og dukkede op i `git
+# status` uden at nogen havde rørt den.
+#
+# Den er målt til ikke at gøre noget for os i CI: typecheck-trinnet kører før
+# noget er bygget, så .next/types findes ikke på det tidspunkt, og en ugyldig
+# rute slipper igennem tsc uanset om filen er committet eller ej. Det er
+# `next build` der fanger den — og buildet laver filen selv.
+apps/web/next-env.d.ts
+
 # turbo
 .turbo/
 
