@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
-import { ApiError } from "@/lib/api/client";
-import { api } from "@/lib/api/api.server";
+import { hentArrangement } from "@/lib/arrangement.server";
 import { getCurrentUser } from "@/lib/session";
 import { paaArrangementsVaert } from "@/lib/arrangement-vaert.server";
 import { GatheringBar } from "@/components/gathering/gathering-bar";
@@ -15,18 +14,9 @@ import { formatDate } from "@/lib/format";
  * Ét arrangement. Er opslaget udgivet, læses siden som en beretning; ellers
  * er det fladen man bruger mens det står på.
  *
- * API'et svarer 404 — ikke 403 — på et arrangement man ikke er inviteret til,
- * netop for ikke at røbe at det findes. Den skelnen skal siden ikke lave om
- * på, så et 404 herfra bliver til Next's `notFound()` uden videre.
+ * `hentArrangement` ligger i `lib/arrangement.server.ts`, fordi styringen
+ * henter det samme og skal behandle et 404 på nøjagtig samme måde.
  */
-async function hentArrangement(slug: string) {
-  try {
-    return await api.gatherings.get(slug);
-  } catch (error) {
-    if (error instanceof ApiError && (error.status === 404 || error.status === 403)) return null;
-    throw error;
-  }
-}
 
 export async function generateMetadata({
   params,
@@ -66,7 +56,8 @@ export default async function ArrangementPage({ params }: { params: Promise<{ sl
       <GatheringBar
         titel={detail.title}
         tilbage={egenVaert ? "listeRod" : "liste"}
-        gatheringId={detail.viewer.isAdmin ? detail.id : undefined}
+        slug={detail.slug}
+        kanStyre={detail.viewer.isAdmin}
       />
 
       <div className="mx-auto max-w-3xl px-4 py-5 sm:px-6">

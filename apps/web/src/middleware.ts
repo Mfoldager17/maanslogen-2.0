@@ -143,12 +143,18 @@ export const config = {
     '/arrangementer/:path*',
     '/drikkevarer/:slug/anmeld',
     /*
-     * De to sidste findes for arrangementsværten: dér er `/` listen og
-     * `/{slug}` ét arrangement. På hovedværten falder de samme stier
-     * igennem uden at blive rørt — `arrangementsSti` svarer `null`, og
-     * middlewaren returnerer `NextResponse.next()` som før.
+     * De tre sidste findes for arrangementsværten: dér er `/` listen,
+     * `/{slug}` ét arrangement og `/{slug}/styring` dets styring. På
+     * hovedværten falder de samme stier igennem uden at blive rørt —
+     * `arrangementsSti` svarer `null`, og middlewaren returnerer
+     * `NextResponse.next()` som før.
+     *
+     * Styringen står her for sig: `/:slug` dækker kun ét led, så uden den
+     * ville den korte adresse på arrangementsværten ikke blive skrevet om,
+     * og man ville få en 404 på den ene vært og siden på den anden.
      */
     '/',
     '/:slug',
+    '/:slug/styring',
   ],
 };

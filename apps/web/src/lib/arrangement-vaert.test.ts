@@ -20,6 +20,12 @@ describe('arrangementsværten', () => {
       expect(sti('/ginsmagning')).toBe('/arrangementer/ginsmagning');
     });
 
+    it('styringen under et arrangement', () => {
+      // Den korte adresse på arrangementsværten. Uden den ville styringen
+      // kun kunne nås på hovedværtens lange form.
+      expect(sti('/ginsmagning/styring')).toBe('/arrangementer/ginsmagning/styring');
+    });
+
     it('uanset store bogstaver i værtsnavnet', () => {
       // Host-headeren er ikke versalfølsom, og en browser kan sende hvad som helst.
       expect(sti('/ginsmagning', VAERT.toUpperCase())).toBe('/arrangementer/ginsmagning');
@@ -54,6 +60,7 @@ describe('arrangementsværten', () => {
       // Ellers blev /arrangementer til /arrangementer/arrangementer.
       expect(sti('/arrangementer')).toBeNull();
       expect(sti('/arrangementer/ginsmagning')).toBeNull();
+      expect(sti('/arrangementer/ginsmagning/styring')).toBeNull();
     });
 
     it('på login og opret — sessionen er host-only pr. vært', () => {

@@ -110,6 +110,7 @@ describe('arrangementsfladen bærer ikke sitets ramme', () => {
   const SIDER = [
     'app/(arrangement)/arrangementer/page.tsx',
     'app/(arrangement)/arrangementer/[slug]/page.tsx',
+    'app/(arrangement)/arrangementer/[slug]/styring/page.tsx',
   ];
 
   /** Alle layout.tsx fra sidens egen mappe og op til app/, som Next stabler dem. */
@@ -150,6 +151,42 @@ describe('arrangementsfladen bærer ikke sitets ramme', () => {
       'Arrangementsfladen skal være ren. Sidehoved og sidefod koster omkring ' +
         'en tredjedel af en telefonskærm på navigation væk fra siden:\n' +
         ramme.join('\n'),
+    ).toEqual([]);
+  });
+});
+
+/**
+ * Fladen skal kunne stå alene på arrangementsværten.
+ *
+ * Dér bliver alt uden for `/arrangementer` skrevet om: `/admin/arrangementer/{id}`
+ * blev til `/arrangementer/admin/arrangementer/{id}` og endte i en 404. Netop
+ * den adresse sad bag tandhjulet i bjælken, så den eneste vej til styringen
+ * førte ingen steder hen for den der stod på arrangementsværten.
+ *
+ * En typecheck fanger den ikke: `/admin/arrangementer/{id}` *er* en gyldig rute
+ * — bare ikke på den vært.
+ */
+describe('arrangementsfladen peger ikke ind i admin', () => {
+  it.each(FILER.map((f) => f.navn))('%s', (navn) => {
+    const fil = FILER.find((f) => f.navn === navn);
+    // Kun adresser i kode. Kommentarer må gerne nævne admin — den her fil
+    // handler netop om hvorfor man ikke skal derhen.
+    const udad = (fil?.indhold ?? '')
+      .split('\n')
+      .filter((linje) => {
+        const trimmet = linje.trimStart();
+        if (trimmet.startsWith('*') || trimmet.startsWith('//') || trimmet.startsWith('/*')) {
+          return false;
+        }
+        return /["'`]\/admin/.test(linje);
+      })
+      .map((linje) => linje.trim());
+
+    expect(
+      udad,
+      `${navn} peger på en adresse under /admin. På arrangementsværten findes ` +
+        'den ikke — den bliver skrevet om til /arrangementer/admin/… og ender ' +
+        'i en 404. Læg vejen under /arrangementer i stedet.',
     ).toEqual([]);
   });
 });
