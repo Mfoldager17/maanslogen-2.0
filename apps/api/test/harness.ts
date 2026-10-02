@@ -31,6 +31,7 @@ export async function startHarness(): Promise<TestHarness> {
 export async function resetDatabase(prisma: PrismaService): Promise<void> {
   await prisma.$executeRawUnsafe(`
     TRUNCATE TABLE
+      gathering_photos, gathering_notes, gathering_items, gathering_attendees, gatherings,
       review_answers, reviews,
       beverage_attribute_values, beverages,
       attribute_definitions, questions,

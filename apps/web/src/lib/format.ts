@@ -9,6 +9,7 @@ const dateFormat = new Intl.DateTimeFormat('da-DK', {
   month: 'long',
   year: 'numeric',
 });
+const timeFormat = new Intl.DateTimeFormat('da-DK', { hour: '2-digit', minute: '2-digit' });
 
 export function formatNumber(value: number): string {
   return numberFormat.format(value);
@@ -24,6 +25,11 @@ export function formatCount(value: number): string {
 
 export function formatDate(value: string | Date): string {
   return dateFormat.format(typeof value === 'string' ? new Date(value) : value);
+}
+
+/** Klokkeslæt alene. Tidspunkterne i et arrangement hører alle til samme aften. */
+export function formatTime(value: string | Date): string {
+  return timeFormat.format(typeof value === 'string' ? new Date(value) : value);
 }
 
 /** "for 3 dage siden" — falder tilbage til en dato når det bliver for længe siden. */

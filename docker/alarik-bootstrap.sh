@@ -17,6 +17,7 @@ set -eu
 : "${ALARIK_URL:=http://alarik:8080}"
 : "${S3_REGION:=auto}"
 : "${BUCKETS:=maanslogen-dev maanslogen-test}"
+: "${PRIVATE_BUCKETS:=maanslogen-privat-dev maanslogen-privat-test}"
 
 forsoeg=0
 until curl -fsS "$ALARIK_URL/readyz" >/dev/null 2>&1; do
@@ -26,6 +27,33 @@ until curl -fsS "$ALARIK_URL/readyz" >/dev/null 2>&1; do
     exit 1
   fi
   sleep 2
+done
+
+# Arrangementernes billeder. Disse oprettes her frem for kun at stå i
+# DEFAULT_BUCKETS, fordi Alarik kun seeder buckets ved FØRSTE boot: har man
+# allerede en volume — og det har alle der har kørt projektet før — bliver en
+# ny bucket i listen aldrig oprettet, og uploads fejler med NoSuchBucket uden
+# at noget andet ser forkert ud.
+#
+# De får bevidst INGEN politik. Får de offentlig læsning, er hele pointen med
+# en privat bucket forbi.
+for bucket in $PRIVATE_BUCKETS; do
+  status=$(curl -sS -o /tmp/svar.txt -w '%{http_code}' \
+    -X PUT "$ALARIK_URL/${bucket}" \
+    --aws-sigv4 "aws:amz:${S3_REGION}:s3" \
+    --user "${S3_ACCESS_KEY_ID}:${S3_SECRET_ACCESS_KEY}")
+
+  case "$status" in
+    # 409 = bucketen findes allerede og er vores. Det er det normale svar fra
+    # anden kørsel og frem, og det er ikke en fejl.
+    2*|409) echo "$bucket: privat bucket findes." ;;
+    *)
+      echo "$bucket: kunne ikke oprette privat bucket (HTTP $status)." >&2
+      cat /tmp/svar.txt >&2 || true
+      echo >&2
+      exit 1
+      ;;
+  esac
 done
 
 for bucket in $BUCKETS; do

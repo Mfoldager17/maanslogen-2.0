@@ -7,12 +7,20 @@ import type {
   Brand,
   BeverageType,
   Category,
+  Gathering,
+  GatheringDetail,
+  GatheringPhotoUpload,
   CreateBeverageInput,
   CreateBrandInput,
   CreateCategoryInput,
   CreateAttributeDefinitionInput,
+  AttachGatheringPhotoInput,
+  CreateGatheringInput,
   CreateQuestionInput,
   CreateReviewInput,
+  AddGatheringItemInput,
+  InviteAttendeeInput,
+  PresignGatheringPhotoInput,
   LoginInput,
   Paginated,
   PresignRequest,
@@ -24,9 +32,13 @@ import type {
   UpdateBeverageInput,
   UpdateBrandInput,
   UpdateCategoryInput,
+  UpdateGatheringInput,
+  UpdateGatheringItemInput,
+  UpdateGatheringPhotoInput,
   UpdateAttributeDefinitionInput,
   UpdateQuestionInput,
   UpdateReviewInput,
+  UpsertGatheringNoteInput,
   User,
 } from '@maanslogen/contracts';
 import type { ApiRequest, QueryValue } from './client';
@@ -133,6 +145,71 @@ export function createEndpoints(request: Fetcher) {
       remove: (id: string) => request<void>(`/users/${id}`, { method: 'DELETE' }),
       updateProfile: (body: { displayName?: string }) =>
         request<User>('/users/me', { method: 'PATCH', body }),
+    },
+
+    gatherings: {
+      list: (query?: Query) => request<Paginated<Gathering>>('/gatherings', { query }),
+      get: (idOrSlug: string) => request<GatheringDetail>(`/gatherings/${idOrSlug}`),
+      create: (body: CreateGatheringInput) =>
+        request<GatheringDetail>('/gatherings', { method: 'POST', body }),
+      update: (idOrSlug: string, body: UpdateGatheringInput) =>
+        request<GatheringDetail>(`/gatherings/${idOrSlug}`, { method: 'PATCH', body }),
+      remove: (idOrSlug: string) => request<void>(`/gatherings/${idOrSlug}`, { method: 'DELETE' }),
+      publish: (idOrSlug: string) =>
+        request<GatheringDetail>(`/gatherings/${idOrSlug}/publish`, { method: 'POST' }),
+      unpublish: (idOrSlug: string) =>
+        request<GatheringDetail>(`/gatherings/${idOrSlug}/unpublish`, { method: 'POST' }),
+
+      invite: (idOrSlug: string, body: InviteAttendeeInput) =>
+        request<GatheringDetail>(`/gatherings/${idOrSlug}/attendees`, { method: 'POST', body }),
+      uninvite: (idOrSlug: string, attendeeId: string) =>
+        request<GatheringDetail>(`/gatherings/${idOrSlug}/attendees/${attendeeId}`, {
+          method: 'DELETE',
+        }),
+
+      addItem: (idOrSlug: string, body: AddGatheringItemInput) =>
+        request<GatheringDetail>(`/gatherings/${idOrSlug}/items`, { method: 'POST', body }),
+      updateItem: (idOrSlug: string, itemId: string, body: UpdateGatheringItemInput) =>
+        request<GatheringDetail>(`/gatherings/${idOrSlug}/items/${itemId}`, {
+          method: 'PATCH',
+          body,
+        }),
+      removeItem: (idOrSlug: string, itemId: string) =>
+        request<GatheringDetail>(`/gatherings/${idOrSlug}/items/${itemId}`, { method: 'DELETE' }),
+      serveItem: (idOrSlug: string, itemId: string) =>
+        request<GatheringDetail>(`/gatherings/${idOrSlug}/items/${itemId}/serve`, {
+          method: 'POST',
+        }),
+
+      // Billederne ligger i en privat bucket. URL'en til dem kommer med i
+      // arrangementets svar, signeret og kortlivet — der findes ikke noget
+      // endpoint der udleverer en blivende adresse.
+      presignPhoto: (idOrSlug: string, body: PresignGatheringPhotoInput) =>
+        request<GatheringPhotoUpload>(`/gatherings/${idOrSlug}/photos/presign`, {
+          method: 'POST',
+          body,
+        }),
+      attachPhoto: (idOrSlug: string, body: AttachGatheringPhotoInput) =>
+        request<GatheringDetail>(`/gatherings/${idOrSlug}/photos`, { method: 'POST', body }),
+      updatePhoto: (idOrSlug: string, photoId: string, body: UpdateGatheringPhotoInput) =>
+        request<GatheringDetail>(`/gatherings/${idOrSlug}/photos/${photoId}`, {
+          method: 'PATCH',
+          body,
+        }),
+      removePhoto: (idOrSlug: string, photoId: string) =>
+        request<GatheringDetail>(`/gatherings/${idOrSlug}/photos/${photoId}`, { method: 'DELETE' }),
+
+      // Noten er din egen; API'et udleder hvem du er af tokenet. Derfor PUT på
+      // en fast sti frem for POST med et id — der findes kun én pr. deltager.
+      upsertNote: (idOrSlug: string, itemId: string, body: UpsertGatheringNoteInput) =>
+        request<GatheringDetail>(`/gatherings/${idOrSlug}/items/${itemId}/note`, {
+          method: 'PUT',
+          body,
+        }),
+      removeNote: (idOrSlug: string, itemId: string) =>
+        request<GatheringDetail>(`/gatherings/${idOrSlug}/items/${itemId}/note`, {
+          method: 'DELETE',
+        }),
     },
 
     media: {

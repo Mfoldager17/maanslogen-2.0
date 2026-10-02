@@ -28,6 +28,7 @@ const RULES: { pattern: RegExp; minRole: Role }[] = [
   { pattern: /^\/admin\/brugere(\/|$)/, minRole: 'ADMIN' },
   { pattern: /^\/admin(\/|$)/, minRole: 'MODERATOR' },
   { pattern: /^\/profil(\/|$)/, minRole: 'USER' },
+  { pattern: /^\/arrangementer(\/|$)/, minRole: 'USER' },
   { pattern: /^\/drikkevarer\/[^/]+\/anmeld$/, minRole: 'USER' },
 ];
 
@@ -114,5 +115,10 @@ function roleFromToken(token: string): Role | null {
 }
 
 export const config = {
-  matcher: ['/admin/:path*', '/profil/:path*', '/drikkevarer/:slug/anmeld'],
+  matcher: [
+    '/admin/:path*',
+    '/profil/:path*',
+    '/arrangementer/:path*',
+    '/drikkevarer/:slug/anmeld',
+  ],
 };

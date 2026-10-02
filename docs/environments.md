@@ -47,14 +47,15 @@ ikke beskeden, den spørger GitHub selv og udfører kun `docker pull` og
 `docker run` med argumenter, den selv bestemmer ud fra kode der ligger på
 `main`. Se [`infra/pi/agent/`](../infra/pi/agent/).
 
-|          | Produktion              | Staging                | Dev                                  |
-| -------- | ----------------------- | ---------------------- | ------------------------------------ |
-| Web      | Worker `maanslogen-web` | Alias `staging`        | Alias `dev`                          |
-| API      | `api`                   | `api-staging`          | `api-dev`                            |
-| Database | `maanslogen`            | `maanslogen_dev`       | `maanslogen_dev` — **delt**          |
-| Billeder | `maanslogen-media`      | `maanslogen-media-dev` | `maanslogen-media-dev`               |
-| Følger   | Seneste release         | `main`                 | PR med label'en `dev`, ellers `main` |
-| Lever    | Altid                   | Altid                  | Altid — skifter hvad den viser       |
+|                      | Produktion                 | Staging                        | Dev                                  |
+| -------------------- | -------------------------- | ------------------------------ | ------------------------------------ |
+| Web                  | Worker `maanslogen-web`    | Alias `staging`                | Alias `dev`                          |
+| API                  | `api`                      | `api-staging`                  | `api-dev`                            |
+| Database             | `maanslogen`               | `maanslogen_dev`               | `maanslogen_dev` — **delt**          |
+| Billeder             | `maanslogen-media`         | `maanslogen-media-dev`         | `maanslogen-media-dev`               |
+| Arrangementsbilleder | `maanslogen-arrangementer` | `maanslogen-arrangementer-dev` | `maanslogen-arrangementer-dev`       |
+| Følger               | Seneste release            | `main`                         | PR med label'en `dev`, ellers `main` |
+| Lever                | Altid                      | Altid                          | Altid — skifter hvad den viser       |
 
 ---
 
@@ -172,6 +173,14 @@ Bagefter, i hånden i dashboardet:
 - **R2 → hver bucket → Settings → Public access → Custom domains**: knyt
   `media-maanslogen.mathiasfoldager.com` til prod-bucketen og
   `media-dev-maanslogen.mathiasfoldager.com` til dev-bucketen.
+
+  **Kun de to.** `maanslogen-arrangementer`, `maanslogen-arrangementer-dev` og
+  `maanslogen-backup` skal hverken have custom domain eller offentlig adgang.
+  Arrangementernes billeder nås udelukkende gennem en kortlivet signeret URL,
+  som API'et udsteder efter at have tjekket at den der spørger er inviteret.
+  Sætter man et domæne foran dem, er den mekanisme forbi: så kan ethvert
+  billede fra en smagning hentes udenom API'et af enhver der kender nøglen.
+
 - **Caching → Tiered Cache**: slå Smart Tiered Caching til. Gratis, og det
   skærer i Class B-operationerne. Se [`r2-omkostninger.md`](r2-omkostninger.md).
 

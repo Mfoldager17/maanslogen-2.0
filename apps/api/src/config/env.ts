@@ -60,6 +60,14 @@ const envSchema = z
     R2_BUCKET: z.string().optional(),
     /** Offentligt domæne foran bucketen, fx https://media-maanslogen.mathiasfoldager.com */
     R2_PUBLIC_BASE_URL: z.string().optional(),
+    /**
+     * Bucketen til arrangementernes billeder. Den har hverken offentligt domæne
+     * eller læsepolitik — indholdet kan kun nås gennem en signeret URL API'et
+     * udsteder efter adgangstjekket. Derfor findes der heller ingen
+     * `*_PRIVATE_PUBLIC_BASE_URL`; kunne man skrive den, ville bucketen ikke
+     * være privat.
+     */
+    R2_PRIVATE_BUCKET: z.string().optional(),
 
     S3_ENDPOINT: z.string().optional(),
     S3_REGION: z.string().default('auto'),
@@ -67,8 +75,16 @@ const envSchema = z
     S3_SECRET_ACCESS_KEY: z.string().optional(),
     S3_BUCKET: z.string().optional(),
     S3_PUBLIC_BASE_URL: z.string().optional(),
+    /** Se R2_PRIVATE_BUCKET. */
+    S3_PRIVATE_BUCKET: z.string().optional(),
 
     UPLOAD_URL_TTL_SECONDS: z.coerce.number().int().positive().max(3_600).default(900),
+    /**
+     * Hvor længe en signeret læse-URL til et arrangementsbillede holder.
+     * Kort nok til at en delt URL ikke er en permanent adgang, langt nok til
+     * at man kan læse et opslag færdigt uden at billederne dør undervejs.
+     */
+    PRIVATE_URL_TTL_SECONDS: z.coerce.number().int().positive().max(3_600).default(900),
     /** Hvor længe en uafhentet upload får lov at ligge før oprydning. */
     PENDING_UPLOAD_TTL_MINUTES: z.coerce.number().int().positive().default(60),
 
@@ -85,6 +101,7 @@ const envSchema = z
         'R2_SECRET_ACCESS_KEY',
         'R2_BUCKET',
         'R2_PUBLIC_BASE_URL',
+        'R2_PRIVATE_BUCKET',
       ] as const) {
         if (!env[key]) {
           ctx.addIssue({
@@ -100,6 +117,7 @@ const envSchema = z
         'S3_ACCESS_KEY_ID',
         'S3_SECRET_ACCESS_KEY',
         'S3_BUCKET',
+        'S3_PRIVATE_BUCKET',
       ] as const) {
         if (!env[key]) {
           ctx.addIssue({

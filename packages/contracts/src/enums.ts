@@ -62,3 +62,27 @@ export const MEDIA_OWNER_VARIANTS: Record<MediaOwnerType, readonly MediaVariant[
   CATEGORY: ['THUMB', 'CARD'],
   USER: ['AVATAR'],
 };
+
+export const gatheringKindSchema = z
+  .enum(['TASTING', 'FESTIVAL', 'VISIT', 'DINNER', 'OTHER'])
+  .meta({
+    id: 'GatheringKind',
+    description:
+      'Hvad slags arrangement. TASTING er kurateret: rækkefølgen er bestemt i forvejen, og værten skænker én ad gangen. De øvrige er ad hoc — deltagerne skriver ind hvad de drikker, undervejs.',
+  });
+export type GatheringKind = z.infer<typeof gatheringKindSchema>;
+
+/**
+ * Den ene forskel der betyder noget i koden: hvem må lægge ting på listen, og
+ * er der en rækkefølge bestemt i forvejen. Alt andet er fælles.
+ */
+export function erKurateret(kind: GatheringKind): boolean {
+  return kind === 'TASTING';
+}
+
+export const gatheringStatusSchema = z.enum(['PLANNED', 'LIVE', 'DONE']).meta({
+  id: 'GatheringStatus',
+  description:
+    'PLANNED: oprettet, ikke begyndt. LIVE: i gang — her skrives noterne. DONE: afholdt; værten skriver opslaget færdigt og udgiver det.',
+});
+export type GatheringStatus = z.infer<typeof gatheringStatusSchema>;

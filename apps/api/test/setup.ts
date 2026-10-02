@@ -19,6 +19,9 @@ process.env.S3_BUCKET = 'maanslogen-test';
 process.env.S3_ACCESS_KEY_ID = 'test';
 process.env.S3_SECRET_ACCESS_KEY = 'test';
 process.env.S3_PUBLIC_BASE_URL = 'http://127.0.0.1:9000/maanslogen-test';
+// Arrangementernes billeder. Testene signerer kun URL'er — det sker lokalt
+// uden at røre bucketen — så den behøver ikke findes for at de kan køre.
+process.env.S3_PRIVATE_BUCKET = 'maanslogen-privat-test';
 process.env.CORS_ORIGINS = 'http://localhost:3000';
 process.env.LOG_LEVEL = 'silent';
 process.env.ENABLE_SWAGGER = 'false';
