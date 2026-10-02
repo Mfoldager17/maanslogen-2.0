@@ -81,7 +81,12 @@ export default async function BeveragePage({ params }: Params) {
           alt={beverage.name}
           variant="FULL"
           categoryName={beverage.category?.name}
-          className="aspect-square w-full max-w-[22rem] rounded-[var(--radius-card)] border border-line sm:max-w-none"
+          // `mx-auto`: loftet på 22rem er mindre end bredden på alt fra en
+          // iPhone 15 og op, så billedet stod til venstre med et hul i højre
+          // side — målt til 46px på en 15 Pro Max — mens overskrift, brødtekst
+          // og knap nedenunder gik helt ud. Fra `sm` falder loftet væk, og så
+          // har `auto` ikke noget at fordele.
+          className="mx-auto aspect-square w-full max-w-[22rem] rounded-[var(--radius-card)] border border-line sm:max-w-none"
           sizes="(max-width: 640px) 100vw, (max-width: 1024px) 15rem, 20rem"
           priority
         />
