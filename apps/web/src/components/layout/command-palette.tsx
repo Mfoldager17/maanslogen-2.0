@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import * as Dialog from "@radix-ui/react-dialog";
+import { Search } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api/api.browser";
 import { Keycap } from "@/components/ui/keycap";
@@ -143,20 +144,35 @@ export function CommandPalette() {
 
   return (
     <>
+      {/*
+       * To former, ikke én skrumpet.
+       *
+       * På telefon stod ordet «Søg» og ⌘K-tasten skjult, og tilbage var en
+       * 44px kasse med et `›` og et `⌕` — U+2315, som de fleste skrifter
+       * sætter tyndt og lille. Den lignede ikke en søgning, og man kunne se
+       * lige forbi den. Her er det i stedet et almindeligt forstørrelsesglas i
+       * samme mål som temaknappen ved siden af.
+       *
+       * Fra `sm` er der plads til striben der ligner en prompt, og den bliver:
+       * ⌘K er husets måde at betjene værktøjet på, og tastaturet findes dér.
+       */}
       <button
         type="button"
         onClick={() => setÅben(true)}
         aria-label="Søg og spring til"
-        className="inline-flex h-11 items-center gap-2 rounded-[var(--radius-control)] border border-line-strong bg-sunken px-2.5 font-mono text-xs text-ink-muted transition-colors hover:border-accent-line hover:text-ink"
+        className={cn(
+          "inline-flex h-11 w-11 items-center justify-center rounded-[var(--radius-control)]",
+          "text-ink-muted transition-colors hover:bg-sunken hover:text-ink",
+          "sm:w-auto sm:justify-start sm:gap-2 sm:border sm:border-line-strong sm:bg-sunken",
+          "sm:px-2.5 sm:font-mono sm:text-xs sm:hover:border-accent-line",
+        )}
       >
-        <span className="text-accent" aria-hidden="true">
+        <Search className="h-5 w-5 sm:hidden" aria-hidden="true" />
+        <span className="hidden text-accent sm:inline" aria-hidden="true">
           ›
         </span>
         <span className="hidden sm:inline">Søg</span>
         <Keycap className="ml-1 hidden sm:inline-flex">⌘K</Keycap>
-        <span className="sm:hidden" aria-hidden="true">
-          ⌕
-        </span>
       </button>
 
       <Dialog.Root open={åben} onOpenChange={setÅben}>
