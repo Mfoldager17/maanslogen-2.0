@@ -179,49 +179,24 @@ at blive sendt til login.
 
 ---
 
-## Arrangementernes egen vært
+## Arrangementsfladen
 
-Arrangementerne kan bo på deres eget værtsnavn, fx
-`arrangement-maanslogen.mathiasfoldager.com`. Dér er `/` listen og `/{slug}` ét
-arrangement, så adressen man deler til en smagning er kort og kun handler om
-den.
+Arrangementerne ligger under `/arrangementer` som alt andet, men i rutegruppen
+`(arrangement)`, som hverken har sidehoved eller sidefod. Det er ikke en app
+til — samme kode, samme Worker — men fladen bliver brugt stående, med en
+telefon i den ene hånd og et glas i den anden, og sidehoved plus sidefod koster
+omkring en tredjedel af en telefonskærm på at navigere _væk_ fra netop den side
+man står og bruger.
 
-Det er **ikke** en app til. Samme kode, samme Worker — et værtsnavn er bare en
-anden dør ind. `middleware.ts` læser `Host` og skriver stien om; fladen selv
-ligger i rutegruppen `(arrangement)`, som hverken har sidehoved eller sidefod.
+En rutegruppe ændrer ikke adressen: siderne hedder stadig `/arrangementer` og
+`/arrangementer/{slug}`, og styringen `/arrangementer/{slug}/styring`.
 
-To ting skal sættes op, og rækkefølgen er ligegyldig:
-
-1. **Custom domain på Workeren.** Cloudflare opretter DNS-recorden i samme
-   greb, så der skal ikke noget i Terraform. Det er derfor der heller ikke
-   ligger en record til sitet i `dns.tf` i dag.
-2. **`NEXT_PUBLIC_ARRANGEMENT_HOST`** sat til det samme navn, med port hvis der
-   er en. Den bages ind ved build som de øvrige `NEXT_PUBLIC_*`, så den står i
-   `release.yml` og ikke i `wrangler.jsonc`. I GitHub hedder variablen
-   `PROD_ARRANGEMENT_HOST`.
-
-Er variablen ikke sat, sker der ingenting: der er kun én vært, og
-arrangementerne ligger under `/arrangementer` som hidtil. Sættes den uden at
-værtsnavnet peger på Workeren, er det også harmløst — ingen forespørgsler når
-frem med det navn i `Host`.
-
-`/log-ind`, `/opret` og `/api` skrives aldrig om. De to første skal findes på
-arrangementsværten, fordi **sessionen er host-only pr. vært**: man logger ind
-netop dér, og en session på hovedværten gælder ikke på arrangementsværten. For
-en flade man installerer på hjemmeskærmen er det knap nok mærkbart — man logger
-ind én gang, og refresh-tokenet lever en måned.
-
-Skal de to værter dele session, er det `COOKIE_DOMAIN` der skifter det, og
-afsnittet om cookies ovenfor siger hvad det koster.
-
-### Lokalt
-
-```bash
-NEXT_PUBLIC_ARRANGEMENT_HOST=arrangement.localhost:3000 pnpm dev
-```
-
-Chrome og Firefox sender selv alt under `*.localhost` til 127.0.0.1, så der
-skal ikke redigeres i `/etc/hosts`.
+> Der lå et stykke tid kode til at give arrangementerne deres eget værtsnavn,
+> hvor `/` var listen og `/{slug}` ét arrangement, så adressen man delte til en
+> smagning var kort. Den er taget ud igen: den kostede en omskrivning i
+> `middleware.ts`, en `Host`-aflæsning på hver side og en session pr. vært, og
+> den korte adresse var ikke pengene værd så længe logen er en håndfuld
+> mennesker. Vil man have den igen, ligger den i historikken.
 
 ---
 

@@ -106,11 +106,6 @@ jobs:
         env:
           NEXT_PUBLIC_API_URL: https://${{ vars.PROD_API_HOST }}
           NEXT_PUBLIC_MEDIA_URL: https://${{ vars.PROD_MEDIA_HOST }}
-          # Arrangementernes egen vært. Er variablen ikke sat, er der kun én
-          # vært, og alt ligger under /arrangementer som hidtil — se
-          # docs/deployment.md. Værtsnavnet skal desuden knyttes til Workeren
-          # som custom domain; DNS oprettes af Cloudflare i samme greb.
-          NEXT_PUBLIC_ARRANGEMENT_HOST: ${{ vars.PROD_ARRANGEMENT_HOST }}
         run: pnpm cf:build
 
       - name: Udrul

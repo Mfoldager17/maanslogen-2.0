@@ -9,18 +9,15 @@ import { Button } from "@/components/ui/button";
  * Titlen er sidens `h1`. Den står kun her — gentaget nedenunder ville den koste
  * en `text-3xl` linje af den højde der skal bruges til indholdet.
  *
- * `tilbage` er et af fire faste mål frem for en fri adresse: `typedRoutes`
+ * `tilbage` er et af tre faste mål frem for en fri adresse: `typedRoutes`
  * kræver at adressen kan genkendes som en rute ved bygning, og en almindelig
- * streng udefra kan den ikke. Udeladt er der ingen pil — det er tilfældet på
- * arrangementsværtens forside, hvor der ikke er noget ovenover.
+ * streng udefra kan den ikke. Udeladt er der ingen pil.
  */
 const TILBAGE = {
   /** Ud af arrangementerne og tilbage til sitet. Kun på hovedværten. */
   site: { href: "/", etiket: "Tilbage til Maanslogen" },
-  /** Op til listen, som den ligger på hovedværten. */
+  /** Op til listen. */
   liste: { href: "/arrangementer", etiket: "Tilbage til arrangementer" },
-  /** Op til listen på arrangementsværten, hvor den er forsiden. */
-  listeRod: { href: "/", etiket: "Tilbage til arrangementer" },
 } as const;
 
 export function GatheringBar({
@@ -85,9 +82,9 @@ export function GatheringBar({
 
         {/*
          * Styringen ligger i arrangementsfladen, ikke i admin. Den pegede før
-         * på `/admin/arrangementer/{id}`, og dén adresse findes ikke på
-         * arrangementsværten: `/admin/...` bliver skrevet om til
-         * `/arrangementer/admin/...` og ender i en 404. Her bliver man.
+         * på `/admin/arrangementer/{id}` — og dermed ud af den rene flade og
+         * ind i sitets admin med sidehoved, brødkrummer og sidefod, midt i en
+         * smagning. Her bliver man.
          */}
         {kanStyre && slug !== undefined ? (
           <Button

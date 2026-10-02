@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { api } from "@/lib/api/api.server";
 import { getCurrentUser } from "@/lib/session";
-import { paaArrangementsVaert } from "@/lib/arrangement-vaert.server";
 import { GatheringBar } from "@/components/gathering/gathering-bar";
 import { GatheringCard } from "@/components/gathering/gathering-card";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -36,13 +35,9 @@ export default async function ArrangementerPage({
     cursor: first(params, "cursor"),
   });
 
-  // På arrangementsværten er listen forsiden, og der er ikke noget ovenover.
-  // På hovedværten er den en del af sitet, og vejen ud går dertil.
-  const egenVaert = await paaArrangementsVaert();
-
   return (
     <>
-      <GatheringBar titel="Arrangementer" tilbage={egenVaert ? undefined : "site"} />
+      <GatheringBar titel="Arrangementer" tilbage="site" />
 
       <div className="mx-auto max-w-3xl px-4 py-5 sm:px-6">
         <p className="mb-5 text-sm text-ink-muted">

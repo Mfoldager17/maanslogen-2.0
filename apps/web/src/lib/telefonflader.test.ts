@@ -156,15 +156,15 @@ describe('arrangementsfladen bærer ikke sitets ramme', () => {
 });
 
 /**
- * Fladen skal kunne stå alene på arrangementsværten.
+ * Fladen skal kunne stå alene.
  *
- * Dér bliver alt uden for `/arrangementer` skrevet om: `/admin/arrangementer/{id}`
- * blev til `/arrangementer/admin/arrangementer/{id}` og endte i en 404. Netop
- * den adresse sad bag tandhjulet i bjælken, så den eneste vej til styringen
- * førte ingen steder hen for den der stod på arrangementsværten.
+ * Tandhjulet i bjælken pegede på `/admin/arrangementer/{id}`. Et tryk dér
+ * sendte en, der står midt i en smagning med telefonen i den ene hånd, ud af
+ * den rene flade og ind i sitets admin — sidehoved, brødkrummer og sidefod,
+ * altså præcis den ramme fladen findes for at slippe af med.
  *
- * En typecheck fanger den ikke: `/admin/arrangementer/{id}` *er* en gyldig rute
- * — bare ikke på den vært.
+ * En typecheck fanger det ikke: `/admin/arrangementer/{id}` *er* en gyldig
+ * rute. Den fører bare det forkerte sted hen.
  */
 describe('arrangementsfladen peger ikke ind i admin', () => {
   it.each(FILER.map((f) => f.navn))('%s', (navn) => {
@@ -184,9 +184,9 @@ describe('arrangementsfladen peger ikke ind i admin', () => {
 
     expect(
       udad,
-      `${navn} peger på en adresse under /admin. På arrangementsværten findes ` +
-        'den ikke — den bliver skrevet om til /arrangementer/admin/… og ender ' +
-        'i en 404. Læg vejen under /arrangementer i stedet.',
+      `${navn} peger på en adresse under /admin, og dér er sitets ramme om ` +
+        'den. Fladen skal kunne stå alene — læg vejen under /arrangementer ' +
+        'i stedet.',
     ).toEqual([]);
   });
 });

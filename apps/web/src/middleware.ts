@@ -1,5 +1,4 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { arrangementsSti } from '@/lib/arrangement-vaert';
 import {
   ACCESS_TOKEN_COOKIE,
   REFRESH_TOKEN_COOKIE,
@@ -35,31 +34,10 @@ const RULES: { pattern: RegExp; minRole: Role }[] = [
 
 const API_BASE = `${(process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000').replace(/\/+$/, '')}/api/v1`;
 
-/** `NEXT_PUBLIC_ARRANGEMENT_HOST`. Usat = kun én vært, og intet skrives om. */
-const ARRANGEMENT_VAERT = process.env.NEXT_PUBLIC_ARRANGEMENT_HOST;
-
 export async function middleware(request: NextRequest): Promise<NextResponse> {
   const { pathname, search } = request.nextUrl;
-
-  // Adgangen afgøres på den side der faktisk bliver vist. Kiggede vi på den
-  // adresse browseren skrev, ville `/{slug}` på arrangementsværten se ud som
-  // en offentlig side og slippe uden om reglerne herunder.
-  const omskrevet = arrangementsSti({
-    vaert: request.headers.get('host'),
-    pathname,
-    arrangementVaert: ARRANGEMENT_VAERT,
-  });
-  const effektivSti = omskrevet ?? pathname;
-
-  const fortsaet = (): NextResponse => {
-    if (omskrevet === null) return NextResponse.next();
-    const maal = request.nextUrl.clone();
-    maal.pathname = omskrevet;
-    return NextResponse.rewrite(maal);
-  };
-
-  const rule = RULES.find((entry) => entry.pattern.test(effektivSti));
-  if (!rule) return fortsaet();
+  const rule = RULES.find((entry) => entry.pattern.test(pathname));
+  if (!rule) return NextResponse.next();
 
   let accessToken = request.cookies.get(ACCESS_TOKEN_COOKIE)?.value;
   const refreshToken = request.cookies.get(REFRESH_TOKEN_COOKIE)?.value;
@@ -81,7 +59,7 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
     return NextResponse.redirect(new URL(fallback, request.url));
   }
 
-  const response = fortsaet();
+  const response = NextResponse.next();
   for (const cookie of refreshed?.setCookies ?? []) {
     response.headers.append('set-cookie', cookie);
   }
@@ -142,19 +120,5 @@ export const config = {
     '/profil/:path*',
     '/arrangementer/:path*',
     '/drikkevarer/:slug/anmeld',
-    /*
-     * De tre sidste findes for arrangementsværten: dér er `/` listen,
-     * `/{slug}` ét arrangement og `/{slug}/styring` dets styring. På
-     * hovedværten falder de samme stier igennem uden at blive rørt —
-     * `arrangementsSti` svarer `null`, og middlewaren returnerer
-     * `NextResponse.next()` som før.
-     *
-     * Styringen står her for sig: `/:slug` dækker kun ét led, så uden den
-     * ville den korte adresse på arrangementsværten ikke blive skrevet om,
-     * og man ville få en 404 på den ene vært og siden på den anden.
-     */
-    '/',
-    '/:slug',
-    '/:slug/styring',
   ],
 };
