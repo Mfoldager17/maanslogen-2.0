@@ -39,6 +39,62 @@ describe('loadConfig', () => {
     );
   });
 
+  describe('COOKIE_DOMAIN og CORS skal passe sammen', () => {
+    /**
+     * COOKIE_DOMAIN er normalt usat, og så er sessionen host-only pr. vært.
+     * Sættes den for at dele sessionen mellem værter, skal hvert site ligge
+     * under domænet — ellers modtager sitet aldrig sessionen, og brugeren
+     * bliver sendt til login igen og igen uden at noget fejler synligt.
+     * Billigere at opdage ved opstart.
+     */
+    it('afviser et site uden for cookiens domæne', () => {
+      expect(() =>
+        loadConfig({
+          ...BASE,
+          COOKIE_DOMAIN: 'maanslogen.com',
+          CORS_ORIGINS: 'https://maanslogen-web.eksempel.workers.dev',
+        }),
+      ).toThrowError(/uden for COOKIE_DOMAIN/);
+    });
+
+    it('accepterer værter under domænet', () => {
+      const config = loadConfig({
+        ...BASE,
+        COOKIE_DOMAIN: 'maanslogen.com',
+        CORS_ORIGINS: 'https://maanslogen.com,https://arrangement.maanslogen.com',
+      });
+      expect(config.COOKIE_DOMAIN).toBe('maanslogen.com');
+    });
+
+    it('accepterer domænet selv, og en indledende prik', () => {
+      expect(() =>
+        loadConfig({
+          ...BASE,
+          COOKIE_DOMAIN: '.maanslogen.com',
+          CORS_ORIGINS: 'https://maanslogen.com',
+        }),
+      ).not.toThrow();
+    });
+
+    it('lader sig ikke narre af et domæne der blot ender ens', () => {
+      // "ikke-maanslogen.com" ender på "maanslogen.com" som streng, men er et
+      // andet domæne. Uden prikken i sammenligningen ville det slippe igennem.
+      expect(() =>
+        loadConfig({
+          ...BASE,
+          COOKIE_DOMAIN: 'maanslogen.com',
+          CORS_ORIGINS: 'https://ikke-maanslogen.com',
+        }),
+      ).toThrowError(/uden for COOKIE_DOMAIN/);
+    });
+
+    it('rører ikke ved noget når COOKIE_DOMAIN ikke er sat', () => {
+      expect(() =>
+        loadConfig({ ...BASE, CORS_ORIGINS: 'https://hvad-som-helst.example' }),
+      ).not.toThrow();
+    });
+  });
+
   it('kræver R2-nøgler når STORAGE_DRIVER=r2', () => {
     expect(() => loadConfig({ ...BASE, STORAGE_DRIVER: 'r2' })).toThrowError(/R2_ACCOUNT_ID/);
   });

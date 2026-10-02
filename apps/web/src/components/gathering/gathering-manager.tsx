@@ -1,7 +1,9 @@
 "use client";
 
+import type { Route } from "next";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { Plus } from "lucide-react";
 import type { GatheringDetail, User } from "@maanslogen/contracts";
 import { api } from "@/lib/api/api.browser";
 import { useApiMutation } from "@/lib/use-mutation";
@@ -11,6 +13,7 @@ import { Field, NativeSelect, Textarea } from "@/components/ui/field";
 import { Panel } from "@/components/ui/panel";
 import { STATUS_ETIKETTER } from "@/lib/arrangementer";
 import { formatTime } from "@/lib/format";
+import { AddItemSheet } from "./add-item-sheet";
 
 /**
  * Værtens betjeningspanel. Alt herinde er admin-ruter i API'et; fladen
@@ -19,19 +22,31 @@ import { formatTime } from "@/lib/format";
  * Hvert kald svarer med hele arrangementet igen, og `router.refresh()` i
  * `useApiMutation` henter server-komponenterne påny — derfor holdes der ingen
  * kopi af listen i state her, som kunne komme ud af trit med databasen.
+ *
+ * Den står to steder: i admin på hovedværten, og i arrangementsfladen, hvor
+ * den er den eneste vej til styringen på arrangementsværten. Derfor ligger den
+ * her frem for under `components/admin` — og derfor er knapperne 44px. Panelet
+ * bliver brugt stående, midt i en smagning, af den der skal trykke "skænk nu".
+ *
+ * `efterSletning` er hvor man havner når arrangementet er slettet: siden man
+ * stod på findes ikke længere bagefter. Den kommer udefra, fordi de to flader
+ * hører til hver sit sted.
  */
 export function GatheringManager({
   detail,
   kandidater,
+  efterSletning,
 }: {
   detail: GatheringDetail;
   kandidater: User[];
+  efterSletning: Route;
 }) {
   const router = useRouter();
   const { pending, fieldErrors, run } = useApiMutation();
 
   const [story, setStory] = useState(detail.story ?? "");
   const [valgtBruger, setValgtBruger] = useState("");
+  const [tilfoejAaben, setTilfoejAaben] = useState(false);
 
   const inviterede = new Set(detail.attendees.map((attendee) => attendee.userId));
   const kanInviteres = kandidater.filter((bruger) => !inviterede.has(bruger.id));
@@ -66,7 +81,7 @@ export function GatheringManager({
             {udgivet ? (
               <Button
                 variant="secondary"
-                size="sm"
+                size="md"
                 disabled={pending}
                 onClick={() =>
                   void run(() => api.gatherings.unpublish(detail.id), {
@@ -78,7 +93,7 @@ export function GatheringManager({
               </Button>
             ) : (
               <Button
-                size="sm"
+                size="md"
                 disabled={pending}
                 onClick={() =>
                   void run(() => api.gatherings.publish(detail.id), {
@@ -116,7 +131,7 @@ export function GatheringManager({
               )}
               <Button
                 variant="ghost"
-                size="sm"
+                size="md"
                 disabled={pending}
                 onClick={() =>
                   void run(() => api.gatherings.uninvite(detail.id, attendee.id), {
@@ -173,56 +188,92 @@ export function GatheringManager({
         ) : (
           <ol className="grid gap-2">
             {detail.items.map((item, index) => (
-              <li
-                key={item.id}
-                className="flex flex-wrap items-center gap-3 rounded-[var(--radius-control)] bg-sunken px-3 py-2"
-              >
-                <span className="font-mono text-xs text-ink-muted">
-                  {String(index + 1).padStart(2, "0")}
-                </span>
-                <span className="min-w-0 flex-1 truncate text-sm font-semibold">
-                  {item.displayName}
-                </span>
-                {item.beverage === null ? <Badge tone="warning">Ikke i kataloget</Badge> : null}
-                {item.servedAt ? (
+              <li key={item.id} className="rounded-[var(--radius-control)] bg-sunken px-3 py-2.5">
+                {/*
+                 * Navnet på sin egen linje, knapperne under.
+                 *
+                 * Alt stod før på én række med `flex-wrap`, og på en telefon
+                 * efterlod nummer, mærkat, klokkeslæt og to knapper så lidt
+                 * plads til navnet at "Hernö Old Tom" blev til "Hernö O…" —
+                 * netop den oplysning man leder efter. En af knapperne faldt
+                 * oven i købet ned på en linje for sig.
+                 */}
+                <div className="flex items-center gap-3">
                   <span className="font-mono text-xs text-ink-muted">
-                    {formatTime(item.servedAt)}
+                    {String(index + 1).padStart(2, "0")}
                   </span>
-                ) : (
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    disabled={pending}
-                    onClick={() =>
-                      void run(() => api.gatherings.serveItem(detail.id, item.id), {
-                        success: "Skænket",
-                      })
-                    }
-                  >
-                    Skænk nu
-                  </Button>
-                )}
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  disabled={pending}
-                  onClick={() =>
-                    void run(() => api.gatherings.removeItem(detail.id, item.id), {
-                      success: "Fjernet fra listen",
-                    })
-                  }
-                >
-                  Fjern
-                </Button>
+                  <span className="min-w-0 flex-1 truncate text-sm font-semibold">
+                    {item.displayName}
+                  </span>
+                  {item.servedAt ? (
+                    <span className="shrink-0 font-mono text-xs text-ink-muted">
+                      {formatTime(item.servedAt)}
+                    </span>
+                  ) : null}
+                </div>
+
+                <div className="mt-2 flex items-center gap-2">
+                  {item.beverage === null ? <Badge tone="warning">Ikke i kataloget</Badge> : null}
+
+                  <div className="ml-auto flex shrink-0 gap-2">
+                    {item.servedAt ? null : (
+                      <Button
+                        variant="secondary"
+                        size="md"
+                        disabled={pending}
+                        onClick={() =>
+                          void run(() => api.gatherings.serveItem(detail.id, item.id), {
+                            success: "Skænket",
+                          })
+                        }
+                      >
+                        Skænk nu
+                      </Button>
+                    )}
+                    <Button
+                      variant="ghost"
+                      size="md"
+                      disabled={pending}
+                      onClick={() =>
+                        void run(() => api.gatherings.removeItem(detail.id, item.id), {
+                          success: "Fjernet fra listen",
+                        })
+                      }
+                    >
+                      Fjern
+                    </Button>
+                  </div>
+                </div>
               </li>
             ))}
           </ol>
         )}
 
-        <p className="mt-3 text-sm text-ink-muted">
-          Ting lægges på fra selve arrangementssiden — også af deltagerne, hvis det ikke er en
-          smagning.
-        </p>
+        {/*
+         * Listen kunne før kun fyldes fra selve arrangementssiden, og det
+         * læste som om den slet ikke kunne lægges i forvejen. Til en smagning
+         * er rækkefølgen bestemt på forhånd — det er hele forskellen på en
+         * smagning og en festival — så den hører hjemme her, hvor man
+         * forbereder aftenen.
+         */}
+        <div className="mt-4 flex flex-wrap items-center gap-3">
+          <Button disabled={pending} onClick={() => setTilfoejAaben(true)}>
+            <Plus size={18} />
+            Læg noget på listen
+          </Button>
+
+          <p className="text-sm text-ink-muted">
+            Vælg fra kataloget, eller skriv et navn. Er det ikke en smagning, kan deltagerne også
+            selv skrive ind mens det står på.
+          </p>
+        </div>
+
+        <AddItemSheet
+          gatheringId={detail.id}
+          open={tilfoejAaben}
+          onOpenChange={setTilfoejAaben}
+          anledning="paa-forhaand"
+        />
       </Panel>
 
       <Panel title="Opslaget">
@@ -262,7 +313,7 @@ export function GatheringManager({
               const result = await run(() => api.gatherings.remove(detail.id), {
                 success: "Arrangementet er slettet",
               });
-              if (result !== null) router.push("/admin/arrangementer");
+              if (result !== null) router.push(efterSletning);
             }}
             className="ml-auto"
           >

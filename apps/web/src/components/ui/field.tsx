@@ -68,7 +68,11 @@ export interface FieldControlProps {
 }
 
 const CONTROL_BASE =
-  "w-full min-w-0 rounded-[var(--radius-control)] border bg-canvas px-3 text-sm text-ink " +
+  // `text-base` på telefon, ikke `text-sm`: Safari på iOS zoomer ind på siden
+  // når man rører et felt med skrift under 16px, og zoomer ikke ud igen. Det
+  // er især slemt midt i en smagning, hvor man taster med én hånd. På større
+  // skærme er 14px stadig det rigtige, deraf `sm:text-sm`.
+  "w-full min-w-0 rounded-[var(--radius-control)] border bg-canvas px-3 text-base sm:text-sm text-ink " +
   "placeholder:text-ink-muted transition-colors " +
   "disabled:cursor-not-allowed disabled:opacity-60 " +
   "aria-[invalid=true]:border-danger aria-[invalid=true]:bg-danger-soft";

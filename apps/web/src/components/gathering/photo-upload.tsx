@@ -4,17 +4,31 @@ import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/cn";
 import { uploadGatheringPhoto } from "@/lib/upload";
 
 /**
- * Billeder fra aftenen. Flere ad gangen, fordi man vælger dem i kameralruller
+ * Billeder fra aftenen. Flere ad gangen, fordi man vælger dem i kamerarullen
  * og ikke ét for ét.
  *
  * Uploaderne kører sekventielt med vilje: en telefon på et festivalnet skal
  * ikke sende otte filer samtidig, og fejler nummer fem, er de fire første
  * allerede i hus.
+ *
+ * `capture` sættes bevidst ikke: så ville knappen åbne kameraet direkte, og
+ * det meste af tiden vil man vælge noget man lige har taget.
  */
-export function PhotoUpload({ gatheringId, itemId }: { gatheringId: string; itemId?: string }) {
+export function PhotoUpload({
+  gatheringId,
+  itemId,
+  className,
+  icon,
+}: {
+  gatheringId: string;
+  itemId?: string;
+  className?: string;
+  icon?: React.ReactNode;
+}) {
   const router = useRouter();
   const input = useRef<HTMLInputElement>(null);
   const [igang, setIgang] = useState<{ faerdige: number; ialt: number } | null>(null);
@@ -48,7 +62,7 @@ export function PhotoUpload({ gatheringId, itemId }: { gatheringId: string; item
   }
 
   return (
-    <div>
+    <>
       <input
         ref={input}
         type="file"
@@ -59,12 +73,14 @@ export function PhotoUpload({ gatheringId, itemId }: { gatheringId: string; item
       />
       <Button
         variant="secondary"
-        size="sm"
+        size="lg"
         disabled={igang !== null}
         onClick={() => input.current?.click()}
+        className={cn(className)}
       >
-        {igang ? `Lægger op … ${igang.faerdige}/${igang.ialt}` : "Tilføj billeder"}
+        {icon}
+        {igang ? `${igang.faerdige}/${igang.ialt}` : "Billeder"}
       </Button>
-    </div>
+    </>
   );
 }

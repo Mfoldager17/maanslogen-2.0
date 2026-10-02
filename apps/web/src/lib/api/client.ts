@@ -7,6 +7,24 @@ export const API_URL = (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:400
 export const API_BASE = `${API_URL}/api/v1`;
 
 /**
+ * Browserens vej til API'et. Relativ med vilje: kaldet går til sidens **egen**
+ * vært, og `next.config.ts` sender det videre til API'et serverside.
+ *
+ * Det er ikke en omvej for dens egen skyld. Sætter API'et en cookie på sin egen
+ * vært, er den host-only dér, og sidens server ser den aldrig — hverken
+ * `middleware.ts` eller `server.ts` læser cookies fra API'ets forespørgsel, men
+ * fra sidens. Man ville logge ind og stadig blive regnet for logget ud.
+ *
+ * Med rewritet kommer `Set-Cookie` tilbage på den vært browseren faktisk talte
+ * med. Derfor kan hver vært have sin egen session uden en cookie der gælder for
+ * hele domænet og alt hvad der ellers bor under det.
+ *
+ * Serverside kald bruger stadig API_BASE: de har ingen oprindelse at være
+ * relative til, og de sender cookien med i hånden (se server.ts).
+ */
+export const API_BASE_SAMME_OPRINDELSE = '/api/v1';
+
+/**
  * Fejl fra API'et kommer som RFC 9457 Problem Details. Vi pakker dem i en
  * rigtig Error, så et kald enten returnerer data eller kaster — i stedet for
  * 1.0's `{ data?, error? }`, hvor hvert eneste kaldssted skulle huske at
@@ -79,10 +97,14 @@ export interface ApiRequest {
   credentials?: RequestCredentials;
 }
 
-export async function apiRequest<T>(path: string, options: ApiRequest = {}): Promise<T> {
+export async function apiRequest<T>(
+  path: string,
+  options: ApiRequest = {},
+  base: string = API_BASE,
+): Promise<T> {
   const { method = 'GET', query, body, headers = {}, next, cache, signal, credentials } = options;
 
-  const response = await fetch(`${API_BASE}${path}${buildQuery(query)}`, {
+  const response = await fetch(`${base}${path}${buildQuery(query)}`, {
     method,
     headers: {
       accept: 'application/json',
