@@ -28,6 +28,7 @@ import { paginate } from '../../common/pagination/cursor';
 import { idOrSlugWhere } from '../../common/utils/id-or-slug';
 import { uniqueSlug } from '../../common/utils/slug';
 import { StorageService } from '../media/storage.service';
+import { ReviewService } from '../reviews/review.service';
 import {
   gatheringDetailInclude,
   gatheringListInclude,
@@ -66,6 +67,7 @@ export class GatheringService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly storage: StorageService,
+    private readonly reviews: ReviewService,
   ) {}
 
   private isAdmin(viewer: AccessTokenClaims): boolean {
@@ -243,6 +245,60 @@ export class GatheringService {
     await this.storage.deletePrivateObjects(noegler);
   }
 
+  /**
+   * Gør aftenens noter til anmeldelser, for de poster der er knyttet til
+   * kataloget.
+   *
+   * Hvorfor først her, og ikke når noten bliver skrevet: en note kan rettes og
+   * slettes så længe opslaget ikke er udgivet. Blev den til en anmeldelse med
+   * det samme, skulle hver rettelse følges ad, og en slettet note ville kunne
+   * slette en stående dom. Ved udgivelsen er noten frosset, og så er den et
+   * svar man kan stå ved.
+   *
+   * `reviewId: null` i filteret er det der gør den idempotent: en note der
+   * allerede er forfremmet, bliver ikke set på igen. Udgiv, lås op, udgiv igen
+   * — der kommer ikke en anmeldelse mere ud af det.
+   *
+   * Servicen svarer selv `null` for den der allerede har anmeldt drikkevaren.
+   * Da bliver noten stående som note, og det er med vilje: se kommentaren over
+   * `reviewId` i skemaet.
+   */
+  private async noterTilAnmeldelser(gatheringId: string): Promise<void> {
+    const noter = await this.prisma.gatheringNote.findMany({
+      where: {
+        reviewId: null,
+        item: { gatheringId, beverageId: { not: null } },
+      },
+      select: {
+        id: true,
+        rating: true,
+        body: true,
+        item: { select: { beverageId: true } },
+        attendee: { select: { userId: true } },
+      },
+    });
+
+    // Efter hinanden, ikke parallelt: hver omdannelse genberegner drikkevarens
+    // gennemsnit i sin egen transaktion, og to der skriver på den samme
+    // drikkevare samtidig ville kunne lægge det forkerte tal tilbage.
+    for (const note of noter) {
+      const beverageId = note.item.beverageId;
+      if (!beverageId) continue;
+
+      const reviewId = await this.reviews.createFromGatheringNote(
+        note.attendee.userId,
+        beverageId,
+        { rating: note.rating, body: note.body },
+      );
+      if (reviewId === null) continue;
+
+      await this.prisma.gatheringNote.update({
+        where: { id: note.id },
+        data: { reviewId },
+      });
+    }
+  }
+
   /** Udgiver opslaget til deltagerne og låser noterne. */
   async publish(idOrSlug: string, viewer: AccessTokenClaims): Promise<GatheringDetail> {
     this.assertAdmin(viewer);
@@ -251,6 +307,10 @@ export class GatheringService {
       where: { id: row.id },
       data: { publishedAt: new Date(), status: 'DONE' },
     });
+
+    // Efter udgivelsen, ikke før: noterne er frosne nu.
+    await this.noterTilAnmeldelser(row.id);
+
     return this.detail(row.id, viewer);
   }
 
@@ -386,6 +446,16 @@ export class GatheringService {
         ...(input.sortOrder !== undefined ? { sortOrder: input.sortOrder } : {}),
       },
     });
+
+    /*
+     * Knytningen sker som regel hjemme i sofaen bagefter: man skrev «Nummer
+     * to» på skiltet og finder først drikkevaren frem senere. Er opslaget
+     * allerede udgivet, nåede udgivelsen ikke at se posten, og noterne skal
+     * med nu. Er det ikke udgivet, venter de — så er de ikke frosne endnu.
+     */
+    if (input.beverageId && row.publishedAt !== null) {
+      await this.noterTilAnmeldelser(row.id);
+    }
 
     return this.detail(row.id, viewer);
   }

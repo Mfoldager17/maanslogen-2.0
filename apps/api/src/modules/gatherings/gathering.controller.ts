@@ -48,6 +48,17 @@ import { GatheringService } from './gathering.service';
  * inviterede, og ingen andre. Et arrangement man ikke er inviteret til svarer
  * 404 frem for 403 — se GatheringService.
  */
+/*
+ * `@HttpCode(HttpStatus.OK)` på tre af POST-ruterne: udgiv, lås op og skænk
+ * opretter ingenting — de ændrer et arrangement der findes, og svarer med
+ * hele arrangementet igen. Nest sender 201 på et POST med mindre andet siges,
+ * og det gjorde den: `@ApiZodResponse(HttpStatus.OK, …)` stod der i forvejen,
+ * så OpenAPI lovede 200 mens serveren sendte 201.
+ *
+ * `attendees` er ikke med i den gruppe, selvom den også svarer med hele
+ * arrangementet: dér bliver der faktisk oprettet en deltager, så 201 er
+ * rigtig, og det var annoteringen der tog fejl.
+ */
 @ApiTags('Arrangementer')
 @ApiBearerAuth()
 @Controller('gatherings')
@@ -116,6 +127,7 @@ export class GatheringController {
 
   @Post(':idOrSlug/publish')
   @MinRole('ADMIN')
+  @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Udgiv opslaget til deltagerne',
     description: 'Låser samtidig noterne. Uden det kunne aftenen skrives om bagefter.',
@@ -128,6 +140,7 @@ export class GatheringController {
 
   @Post(':idOrSlug/unpublish')
   @MinRole('ADMIN')
+  @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Lås op igen, så noter og tekst kan rettes' })
   @ApiZodResponse(HttpStatus.OK, gatheringDetailSchema)
   @ApiProblemResponses(403, 404)
@@ -141,7 +154,10 @@ export class GatheringController {
   @MinRole('ADMIN')
   @ApiOperation({ summary: 'Inviter en bruger' })
   @ApiZodBody(inviteAttendeeSchema)
-  @ApiZodResponse(HttpStatus.OK, gatheringDetailSchema)
+  // 201: der bliver oprettet en deltager. Svaret er hele arrangementet, fordi
+  // det er dét fladen skal bruge bagefter — ikke fordi der ikke blev skabt
+  // noget.
+  @ApiZodResponse(HttpStatus.CREATED, gatheringDetailSchema)
   @ApiProblemResponses(403, 404)
   invite(
     @Param('idOrSlug') idOrSlug: string,
@@ -220,6 +236,7 @@ export class GatheringController {
 
   @Post(':idOrSlug/items/:itemId/serve')
   @MinRole('ADMIN')
+  @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Skænk posten nu',
     description:

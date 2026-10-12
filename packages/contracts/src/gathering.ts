@@ -35,6 +35,15 @@ export const gatheringNoteSchema = z
     authorName: z.string(),
     rating: z.number(),
     body: z.string().nullable(),
+    /**
+     * Sat hvis noten er blevet skriverens anmeldelse af drikkevaren.
+     *
+     * Det sker ved udgivelsen, og kun for poster der er knyttet til kataloget.
+     * Havde skriveren allerede anmeldt drikkevaren, bliver feltet stående tomt
+     * — der kan kun være én anmeldelse pr. bruger pr. drikkevare, og den gamle
+     * skal ikke skrives over. Noten bliver hvad den var.
+     */
+    reviewId: idSchema.nullable(),
     createdAt: isoDateTimeSchema,
     updatedAt: isoDateTimeSchema,
   })
