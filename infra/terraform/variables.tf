@@ -15,33 +15,28 @@ variable "zone_id" {
 }
 
 variable "domain" {
-  description = "Zonen navnene lægges i, fx mathiasfoldager.com."
+  description = "Zonen navnene lægges i, fx maanslogen.com."
   type        = string
-}
-
-variable "projekt" {
-  description = "Mærkatet projektet samles under. Alle navne ender på <projekt>.<domain>."
-  type        = string
-  default     = "maanslogen"
 }
 
 locals {
   # Ét niveau under zonen, aldrig to. Cloudflares gratis universalcertifikat
-  # dækker *.mathiasfoldager.com, men ikke *.*.mathiasfoldager.com, så
-  # api.dev.maanslogen.mathiasfoldager.com ville stå uden certifikat og kun
-  # kunne nås gennem et betalt Advanced Certificate. Derfor bindestreg mellem
-  # rollen og projektet frem for punktum: api-dev-maanslogen.<zone>.
+  # dækker *.maanslogen.com, men ikke *.*.maanslogen.com, så et navn som
+  # api.dev.maanslogen.com ville stå uden certifikat og kun kunne nås gennem
+  # et betalt Advanced Certificate. Derfor bindestreg inde i rollen frem for
+  # punktum: api-dev.<zone>, ikke api.dev.<zone>.
   #
-  # Den dag maanslogen.com er købt, er det de fem linjer nedenfor der bliver
-  # til "api.maanslogen.com" osv. Alt andet læser herfra.
+  # Da navnene lå i en delt zone, bar de også projektnavnet — api-dev-maanslogen.
+  # Med maanslogen.com som sin egen zone er projektet zonen, og leddet er væk.
   #
-  # Kun navnene Terraform selv opretter. Webhook-navnet (deploy-...) laves af
-  # infra/scripts/dns-record.sh og hører derfor ikke til her.
+  # Kun navnene Terraform selv opretter. Sitet ligger på en Worker, og
+  # webhook-navnet (deploy.<zone>) laves af infra/scripts/dns-record.sh; de
+  # hører derfor ikke til her.
   vaert = {
-    api         = "api-${var.projekt}.${var.domain}"
-    api_staging = "api-staging-${var.projekt}.${var.domain}"
-    api_dev     = "api-dev-${var.projekt}.${var.domain}"
-    media       = "media-${var.projekt}.${var.domain}"
-    media_dev   = "media-dev-${var.projekt}.${var.domain}"
+    api         = "api.${var.domain}"
+    api_staging = "api-staging.${var.domain}"
+    api_dev     = "api-dev.${var.domain}"
+    media       = "media.${var.domain}"
+    media_dev   = "media-dev.${var.domain}"
   }
 }

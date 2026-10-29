@@ -69,14 +69,14 @@ aldrig igen.
 **cacher ikke**. Hver visning bliver en Class B-operation.
 
 Tilknyt i stedet et domæne under bucketens _Settings → Public access → Custom
-Domains_, fx `media-maanslogen.mathiasfoldager.com`. Så går trafikken gennem
-Cloudflares cache, og det er dét der gør resten muligt.
+Domains_, fx `media.maanslogen.com`. Så går trafikken gennem Cloudflares
+cache, og det er dét der gør resten muligt.
 
 Sæt derefter:
 
 ```bash
-R2_PUBLIC_BASE_URL=https://media-maanslogen.mathiasfoldager.com
-NEXT_PUBLIC_MEDIA_URL=https://media-maanslogen.mathiasfoldager.com
+R2_PUBLIC_BASE_URL=https://media.maanslogen.com
+NEXT_PUBLIC_MEDIA_URL=https://media.maanslogen.com
 ```
 
 ### 2. En Cache Rule der holder på filerne
@@ -85,7 +85,7 @@ Under _Rules → Cache Rules_ på zonen:
 
 | Felt              | Værdi                                                   |
 | ----------------- | ------------------------------------------------------- |
-| Hvis              | `Hostname equals media-maanslogen.mathiasfoldager.com`  |
+| Hvis              | `Hostname equals media.maanslogen.com`                  |
 | Cache eligibility | Eligible for cache                                      |
 | Edge TTL          | Ignore cache-control header and use this TTL → **1 år** |
 | Browser TTL       | Respect origin (vi sætter selv `immutable` på objektet) |
@@ -146,8 +146,8 @@ Den styrer browserens cache; kantens cache garanteres af Cache Rule'en.
 
 `MediaImage` bruger `unoptimized`. Uden det ville Next hente originalen fra R2
 til sin egen server for at gen-kode den — altså en R2-læsning _plus_ CPU-tid for
-noget der allerede er gjort ved upload. Med `unoptimized` går browseren direkte
-til `media-maanslogen.mathiasfoldager.com`, hvor cachen svarer.
+noget der allerede er gjort ved upload. Med `unoptimized` går browseren
+direkte til `media.maanslogen.com`, hvor cachen svarer.
 
 Vi beholder lazy loading og den reserverede plads fra `next/image`, så billeder
 under skærmkanten slet ikke bliver hentet.

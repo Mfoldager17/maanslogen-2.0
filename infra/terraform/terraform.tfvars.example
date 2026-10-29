@@ -7,9 +7,7 @@
 account_id = "<konto-id fra dashboardets højre side>"
 zone_id    = "<zone-id fra domænets oversigt>"
 
-# Zonen, ikke projektets eget domæne. Alle navne bliver bygget som
-# <rolle>-<projekt>.<domain> — fx api-dev-maanslogen.mathiasfoldager.com.
-domain = "mathiasfoldager.com"
-
-# Udelades, og så bliver det "maanslogen".
-# projekt = "maanslogen"
+# Zonen navnene bygges i. Alle navne bliver <rolle>.<domain> — fx
+# api-dev.maanslogen.com. Ét niveau under zonen, aldrig to; se kommentaren
+# i variables.tf.
+domain = "maanslogen.com"

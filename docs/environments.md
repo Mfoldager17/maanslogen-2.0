@@ -97,32 +97,37 @@ står nedenfor, og den er værd at kende.
 
 ## Hvorfor navnene ser sådan ud
 
-Alle værtsnavne har formen `<rolle>-maanslogen.mathiasfoldager.com`:
+Sitet ligger på zonens rod, resten ét niveau under:
 
-| Rolle        | Værtsnavn                                    |
-| ------------ | -------------------------------------------- |
-| Site         | `maanslogen.mathiasfoldager.com`             |
-| API          | `api-maanslogen.mathiasfoldager.com`         |
-| API staging  | `api-staging-maanslogen.mathiasfoldager.com` |
-| API dev      | `api-dev-maanslogen.mathiasfoldager.com`     |
-| Billeder     | `media-maanslogen.mathiasfoldager.com`       |
-| Billeder dev | `media-dev-maanslogen.mathiasfoldager.com`   |
-| Webhook      | `deploy-maanslogen.mathiasfoldager.com`      |
+| Rolle        | Værtsnavn                    |
+| ------------ | ---------------------------- |
+| Site         | `maanslogen.com`             |
+| API          | `api.maanslogen.com`         |
+| API staging  | `api-staging.maanslogen.com` |
+| API dev      | `api-dev.maanslogen.com`     |
+| Billeder     | `media.maanslogen.com`       |
+| Billeder dev | `media-dev.maanslogen.com`   |
+| Webhook      | `deploy.maanslogen.com`      |
 
-Bindestreg mellem rolle og projekt, ikke punktum — og det er ikke en smagssag.
-Cloudflares gratis universalcertifikat dækker `*.mathiasfoldager.com`, men
-**ikke** `*.*.mathiasfoldager.com`. Et navn som `api.dev.maanslogen.mathiasfoldager.com`
-ville derfor stå uden certifikat og kun kunne nås gennem et betalt Advanced
-Certificate. Ét niveau under zonen, altid.
+Bindestreg inde i rollen, ikke punktum — og det er ikke en smagssag.
+Cloudflares gratis universalcertifikat dækker `*.maanslogen.com`, men
+**ikke** `*.*.maanslogen.com`. Et navn som `api.dev.maanslogen.com` ville
+derfor stå uden certifikat og kun kunne nås gennem et betalt Advanced
+Certificate. Derfor `api-dev`, ikke `api.dev`. Ét niveau under zonen, altid.
 
-Det er også derfor `COOKIE_DOMAIN` ikke sættes: se
-[`deployment.md`](deployment.md#cookies-på-tværs-af-værter).
+Navnene bar tidligere også projektet — `api-dev-maanslogen.<delt-zone>` —
+fordi de lå i en zone sammen med andet. Med `maanslogen.com` som sin egen
+zone er projektet zonen, og det led er væk. Reglen om ét niveau er den
+samme.
 
 De fem navne Terraform opretter — API'erne og billeddomænerne — bygges ét
 sted, i `local.vaert` i
-[`infra/terraform/variables.tf`](../infra/terraform/variables.tf). Den dag
-`maanslogen.com` er købt, er det de fem linjer der bliver til
-`api.maanslogen.com` osv., og `dns.tf` og `cache.tf` læser derfra.
+[`infra/terraform/variables.tf`](../infra/terraform/variables.tf). `dns.tf`
+og `cache.tf` læser derfra, så skal et navn laves om, er det den ene blok
+der skal rettes.
+
+`COOKIE_DOMAIN` sættes stadig ikke, men begrundelsen er nu en anden: se
+[`deployment.md`](deployment.md#cookies-på-tværs-af-værter).
 
 Sitet ligger på en Worker og har ingen DNS-record her; webhook-navnet
 oprettes af [`infra/scripts/dns-record.sh`](../infra/scripts/dns-record.sh).
@@ -171,8 +176,8 @@ Bagefter, i hånden i dashboardet:
 
 - **Tunnelens ingress**: én regel, alt videre til `http://caddy:8080`.
 - **R2 → hver bucket → Settings → Public access → Custom domains**: knyt
-  `media-maanslogen.mathiasfoldager.com` til prod-bucketen og
-  `media-dev-maanslogen.mathiasfoldager.com` til dev-bucketen.
+  `media.maanslogen.com` til prod-bucketen og `media-dev.maanslogen.com` til
+  dev-bucketen.
 
   **Kun de to.** `maanslogen-arrangementer`, `maanslogen-arrangementer-dev` og
   `maanslogen-backup` skal hverken have custom domain eller offentlig adgang.
@@ -341,7 +346,7 @@ På Pi'en:
 ```bash
 # Læg hemmeligheden i samme fil som resten
 echo "WEBHOOK_SECRET=$(openssl rand -hex 32)" | sudo tee -a /etc/maanslogen/pi.env
-echo "DEPLOY_HOST=deploy-maanslogen.mathiasfoldager.com" | sudo tee -a /etc/maanslogen/pi.env
+echo "DEPLOY_HOST=deploy.maanslogen.com" | sudo tee -a /etc/maanslogen/pi.env
 
 sudo cp /opt/maanslogen/infra/pi/agent/maanslogen-webhook.service /etc/systemd/system/
 sudo systemctl daemon-reload
@@ -353,14 +358,14 @@ DNS for `deploy.<domæne>` oprettes som de øvrige:
 
 ```bash
 CF_API_TOKEN=... CF_ZONE_ID=... CF_TUNNEL_ID=... \
-  infra/scripts/dns-record.sh upsert deploy-maanslogen.mathiasfoldager.com
+  infra/scripts/dns-record.sh upsert deploy.maanslogen.com
 ```
 
 I GitHub: _Settings → Webhooks → Add webhook_
 
 | Felt         | Værdi                                                     |
 | ------------ | --------------------------------------------------------- |
-| Payload URL  | `https://deploy-maanslogen.mathiasfoldager.com/github`    |
+| Payload URL  | `https://deploy.maanslogen.com/github`                    |
 | Content type | `application/json`                                        |
 | Secret       | den samme streng som `WEBHOOK_SECRET`                     |
 | Events       | _Let me select individual events_ → kun **Workflow runs** |
@@ -399,15 +404,15 @@ Secrets:
 
 Variables:
 
-| Navn                | Eksempel                                     |
-| ------------------- | -------------------------------------------- |
-| `WORKER_NAME`       | `maanslogen-web`                             |
-| `WORKERS_SUBDOMAIN` | `dit-navn.workers.dev`                       |
-| `PROD_API_HOST`     | `api-maanslogen.mathiasfoldager.com`         |
-| `STAGING_API_HOST`  | `api-staging-maanslogen.mathiasfoldager.com` |
-| `DEV_API_HOST`      | `api-dev-maanslogen.mathiasfoldager.com`     |
-| `PROD_MEDIA_HOST`   | `media-maanslogen.mathiasfoldager.com`       |
-| `DEV_MEDIA_HOST`    | `media-dev-maanslogen.mathiasfoldager.com`   |
+| Navn                | Eksempel                     |
+| ------------------- | ---------------------------- |
+| `WORKER_NAME`       | `maanslogen-web`             |
+| `WORKERS_SUBDOMAIN` | `dit-navn.workers.dev`       |
+| `PROD_API_HOST`     | `api.maanslogen.com`         |
+| `STAGING_API_HOST`  | `api-staging.maanslogen.com` |
+| `DEV_API_HOST`      | `api-dev.maanslogen.com`     |
+| `PROD_MEDIA_HOST`   | `media.maanslogen.com`       |
+| `DEV_MEDIA_HOST`    | `media-dev.maanslogen.com`   |
 
 Alle fem er hele værtsnavne. Der var før en `DEV_DOMAIN`, som workflowet satte
 `api.` foran — den findes ikke længere, netop fordi navnene ikke stables i
@@ -420,7 +425,7 @@ niveauer mere. Se «Hvorfor navnene ser sådan ud» ovenfor.
 
 ```bash
 cd apps/web
-CLOUDFLARE_API_TOKEN=... NEXT_PUBLIC_API_URL=https://api-maanslogen.mathiasfoldager.com pnpm cf:deploy
+CLOUDFLARE_API_TOKEN=... NEXT_PUBLIC_API_URL=https://api.maanslogen.com pnpm cf:deploy
 ```
 
 Worker'en skal findes én gang, før `versions upload` kan lægge versioner op i
@@ -434,8 +439,8 @@ docker ps                              # postgres, api, api-dev, caddy, cloudfla
 journalctl -u maanslogen-agent -n 20   # "api: opdateret" eller ingen ændring
 
 # Udefra
-curl -s https://api-maanslogen.mathiasfoldager.com/api/v1/health/ready
-curl -s https://maanslogen.mathiasfoldager.com -o /dev/null -w '%{http_code}\n'
+curl -s https://api.maanslogen.com/api/v1/health/ready
+curl -s https://maanslogen.com -o /dev/null -w '%{http_code}\n'
 ```
 
 ### 8. Backup af produktionen
