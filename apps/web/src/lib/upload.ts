@@ -58,6 +58,69 @@ export async function uploadImage(
 }
 
 /**
+ * Et billede fra et arrangement.
+ *
+ * Til forskel fra katalogets billeder laves der kun én udgave, og den beskæres
+ * ikke: et billede fra aftenen har ikke en fast ramme at passe ind i. Der
+ * skaleres kun ned, så en telefonoptagelse på 4000 px ikke ryger op i fuld
+ * størrelse.
+ *
+ * Filen går direkte i objektlageret — men i den **private** bucket, og
+ * adressen til den er en signatur API'et udsteder ved hvert svar.
+ */
+export async function uploadGatheringPhoto(
+  gatheringId: string,
+  file: File,
+  options: { itemId?: string; caption?: string } = {},
+): Promise<void> {
+  const contentType = 'image/webp';
+  const blob = await scaleDown(file, 1600, contentType);
+
+  const upload = await api.gatherings.presignPhoto(gatheringId, { contentType });
+
+  const response = await fetch(upload.uploadUrl, {
+    method: 'PUT',
+    body: blob,
+    headers: upload.headers,
+  });
+  if (!response.ok) throw new Error(`Upload fejlede (${response.status})`);
+
+  // Først her findes billedet for API'et. Fejler dette kald, ligger filen som
+  // et forældreløst objekt — det er den samme afvejning som katalogets
+  // uploads, og oprydningen tager dem.
+  await api.gatherings.attachPhoto(gatheringId, {
+    storageKey: upload.storageKey,
+    ...(options.itemId ? { itemId: options.itemId } : {}),
+    ...(options.caption?.trim() ? { caption: options.caption.trim() } : {}),
+  });
+}
+
+/** Skalerer ned til `maks` på den længste led. Mindre billeder røres ikke. */
+async function scaleDown(file: File, maks: number, type: string): Promise<Blob> {
+  const bitmap = await createImageBitmap(file);
+  const scale = Math.min(1, maks / Math.max(bitmap.width, bitmap.height));
+
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.round(bitmap.width * scale);
+  canvas.height = Math.round(bitmap.height * scale);
+
+  const context = canvas.getContext('2d');
+  if (!context) throw new Error('Kunne ikke behandle billedet i browseren');
+
+  context.imageSmoothingQuality = 'high';
+  context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  bitmap.close();
+
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(
+      (blob) => (blob ? resolve(blob) : reject(new Error('Kunne ikke kode billedet'))),
+      type,
+      0.86,
+    );
+  });
+}
+
+/**
  * Skalerer med "cover"-beskæring til den ønskede ramme. Bevidst ikke
  * `object-fit` i CSS: der skal ikke sendes et 4000 px-billede ud til
  * en 200 px-thumbnail.

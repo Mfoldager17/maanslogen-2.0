@@ -4,6 +4,7 @@ export * from './beverage';
 export * from './catalog';
 export * from './enums';
 export * from './errors';
+export * from './gathering';
 export * from './media';
 export * from './pagination';
 export * from './primitives';

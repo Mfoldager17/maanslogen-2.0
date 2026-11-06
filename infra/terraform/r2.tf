@@ -25,3 +25,25 @@ resource "cloudflare_r2_bucket" "backup" {
   name       = "maanslogen-backup"
   location   = "WEUR"
 }
+
+# Arrangementernes billeder.
+#
+# En helt anden bucket end mediebucketen, og det er ikke en detalje: `media`
+# har et offentligt domæne foran, så alt i den kan hentes af enhver der kender
+# nøglen. Et billede fra en smagning må ikke kunne deles ved et uheld.
+#
+# Derfor: intet custom domain, ingen offentlig læsepolitik. API'et udsteder en
+# kortlivet signeret URL efter at have tjekket at den der spørger er inviteret.
+# Sætter man en gang et domæne foran disse to, er hele den mekanisme forbi —
+# billederne ville kunne hentes udenom API'et.
+resource "cloudflare_r2_bucket" "arrangementer" {
+  account_id = var.account_id
+  name       = "maanslogen-arrangementer"
+  location   = "WEUR"
+}
+
+resource "cloudflare_r2_bucket" "arrangementer_dev" {
+  account_id = var.account_id
+  name       = "maanslogen-arrangementer-dev"
+  location   = "WEUR"
+}

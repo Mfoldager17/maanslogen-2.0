@@ -16,6 +16,7 @@ import { CatalogModule } from './modules/catalog/catalog.module';
 import { HealthModule } from './modules/health/health.module';
 import { MediaModule } from './modules/media/media.module';
 import { QuestionModule } from './modules/questions/question.module';
+import { GatheringModule } from './modules/gatherings/gathering.module';
 import { ReviewModule } from './modules/reviews/review.module';
 import { UserModule } from './modules/users/user.module';
 
@@ -81,6 +82,7 @@ function prettyTransport(nodeEnv: AppConfig['NODE_ENV']) {
     BeverageModule,
     QuestionModule,
     ReviewModule,
+    GatheringModule,
     UserModule,
     HealthModule,
   ],

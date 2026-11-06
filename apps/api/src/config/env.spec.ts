@@ -10,6 +10,7 @@ const BASE = {
   S3_ACCESS_KEY_ID: 'minioadmin',
   S3_SECRET_ACCESS_KEY: 'minioadmin',
   S3_BUCKET: 'maanslogen-dev',
+  S3_PRIVATE_BUCKET: 'maanslogen-privat-dev',
 };
 
 describe('loadConfig', () => {
@@ -51,6 +52,7 @@ describe('loadConfig', () => {
       R2_SECRET_ACCESS_KEY: 'secret',
       R2_BUCKET: 'maanslogen',
       R2_PUBLIC_BASE_URL: 'https://cdn.maanslogen.dk',
+      R2_PRIVATE_BUCKET: 'maanslogen-privat',
     });
     expect(config.STORAGE_DRIVER).toBe('r2');
   });

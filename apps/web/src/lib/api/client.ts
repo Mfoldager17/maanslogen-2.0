@@ -68,7 +68,7 @@ export function buildQuery(params: Record<string, QueryValue> | undefined): stri
 }
 
 export interface ApiRequest {
-  method?: 'GET' | 'POST' | 'PATCH' | 'DELETE';
+  method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
   query?: Record<string, QueryValue>;
   body?: unknown;
   headers?: Record<string, string>;

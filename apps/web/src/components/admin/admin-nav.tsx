@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import type { Route } from "next";
 import {
   Beer,
+  CalendarDays,
   FolderTree,
   HelpCircle,
   Image as ImageIcon,
@@ -31,6 +32,10 @@ const GROUPS: { title: string; items: { href: Route; label: string; Icon: typeof
       { href: "/admin/attributter", label: "Attributter", Icon: ListTree },
       { href: "/admin/spoergsmaal", label: "Spørgsmål", Icon: HelpCircle },
     ],
+  },
+  {
+    title: "Logen",
+    items: [{ href: "/admin/arrangementer", label: "Arrangementer", Icon: CalendarDays }],
   },
   {
     title: "Drift",
