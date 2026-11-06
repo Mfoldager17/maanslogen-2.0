@@ -5,7 +5,7 @@ import { api } from "@/lib/api/api.server";
 import { alleSider } from "@/lib/api/alle-sider";
 import { ApiError } from "@/lib/api/client";
 import { AdminPageHeader } from "@/components/admin/page-header";
-import { GatheringManager } from "@/components/admin/gathering-manager";
+import { GatheringManager } from "@/components/gathering/gathering-manager";
 import { Button } from "@/components/ui/button";
 import { ARRANGEMENT_ETIKETTER } from "@/lib/arrangementer";
 
@@ -38,7 +38,7 @@ export default async function AdminGatheringPage({ params }: { params: Promise<{
         }
       />
 
-      <GatheringManager detail={detail} kandidater={brugere} />
+      <GatheringManager detail={detail} kandidater={brugere} efterSletning="/admin/arrangementer" />
     </>
   );
 }

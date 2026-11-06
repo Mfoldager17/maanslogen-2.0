@@ -1,5 +1,6 @@
 "use client";
 
+import { Trash2 } from "lucide-react";
 import type { GatheringPhoto } from "@maanslogen/contracts";
 import { api } from "@/lib/api/api.browser";
 import { useApiMutation } from "@/lib/use-mutation";
@@ -54,19 +55,27 @@ export function PhotoGrid({
             <p className="mt-1 line-clamp-2 text-xs text-ink-muted">{photo.caption}</p>
           ) : null}
 
+          {/*
+           * Altid synlig. Den lå før bag `group-hover`, og telefoner har ikke
+           * hover — så på netop den enhed billederne bliver taget med, kunne
+           * man hverken se eller ramme den.
+           *
+           * `size-11`: 44px, husets egen mindste berøringsflade.
+           */}
           {kanFjerne && photo.uploadedById === viewerId ? (
             <Button
               variant="danger"
-              size="sm"
+              size="md"
               disabled={pending}
-              className="absolute right-1.5 top-1.5 opacity-0 transition-opacity focus-visible:opacity-100 group-hover:opacity-100"
+              aria-label="Fjern billedet"
+              className="absolute right-1.5 top-1.5 size-11 p-0"
               onClick={() =>
                 void run(() => api.gatherings.removePhoto(gatheringId, photo.id), {
                   success: "Billedet er fjernet",
                 })
               }
             >
-              Fjern
+              <Trash2 size={18} />
             </Button>
           ) : null}
         </li>

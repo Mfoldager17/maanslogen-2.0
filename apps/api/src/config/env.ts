@@ -33,8 +33,13 @@ const envSchema = z
           .filter(Boolean),
       ),
     /**
-     * Udelades normalt — så bliver cookien host-only på API'ets eget
-     * værtsnavn. Se docs/deployment.md.
+     * Udelades. Browseren taler med sitets egen vært, ikke med API'et direkte
+     * (se next.config.ts i apps/web), så sessionen bliver host-only dér — og
+     * hver vært får sin egen session uden at nogen cookie når ud over den.
+     *
+     * Sættes den til en fælles forælder, deles sessionen mellem værterne
+     * under den. Det er knappen den dag site og API bor under samme
+     * projekt-domæne. Se docs/deployment.md.
      *
      * Tom streng tælles som fraværende: docker compose indsætter `""` for en
      * variabel der ikke står i env-filen, og den skulle nødig ende som et
@@ -146,6 +151,44 @@ const envSchema = z
           path: ['CORS_ORIGINS'],
           message: 'CORS_ORIGINS skal sættes eksplicit i produktion',
         });
+      }
+    }
+
+    /**
+     * Sættes COOKIE_DOMAIN, skal hvert site i CORS-listen ligge under det.
+     *
+     * En cookie for `maanslogen.com` når aldrig et site på
+     * `maanslogen-web.workers.dev`. Sitet ville så aldrig modtage sessionen —
+     * og det viser sig ikke som en fejl, men som en bruger der bliver ved med
+     * at blive sendt til login. Derfor ved opstart frem for i drift.
+     */
+    if (env.COOKIE_DOMAIN) {
+      const domaene = env.COOKIE_DOMAIN.replace(/^\./, '');
+      for (const origin of env.CORS_ORIGINS) {
+        let vaert: string;
+        try {
+          vaert = new URL(origin).hostname;
+        } catch {
+          ctx.addIssue({
+            code: 'custom',
+            path: ['CORS_ORIGINS'],
+            message: `"${origin}" er ikke en gyldig adresse`,
+          });
+          continue;
+        }
+
+        // Prikken er nødvendig: "ikke-maanslogen.com" ender på "maanslogen.com"
+        // som streng, men er et andet domæne.
+        if (vaert !== domaene && !vaert.endsWith(`.${domaene}`)) {
+          ctx.addIssue({
+            code: 'custom',
+            path: ['COOKIE_DOMAIN'],
+            message:
+              `${origin} ligger uden for COOKIE_DOMAIN=${env.COOKIE_DOMAIN}. ` +
+              'Sitet ville aldrig modtage sessionscookien og ville sende brugeren ' +
+              'til login i en løkke. Flyt sitet ind under domænet, eller ryd COOKIE_DOMAIN.',
+          });
+        }
       }
     }
   });
