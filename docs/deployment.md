@@ -21,8 +21,8 @@ udvikling kan køre mod en lokal S3-server med nøjagtig den samme kode.
 
 2. **Giv den et offentligt domæne.** Under bucketens _Settings → Public access_
    kan man enten slå R2.dev-underdomænet til (fint til test) eller tilknytte et
-   eget domæne som `media-maanslogen.mathiasfoldager.com` (anbefalet — R2.dev
-   er rate limited og må ikke bruges i produktion).
+   eget domæne som `media.maanslogen.com` (anbefalet — R2.dev er rate limited
+   og må ikke bruges i produktion).
 
 3. **Lav en API-token** under _R2 → Manage API Tokens_ med adgangen
    _Object Read & Write_ begrænset til den ene bucket. Du får en Access Key ID og
@@ -41,7 +41,7 @@ Browseren uploader direkte til R2 med presignede URL'er, så bucketen skal tilla
 ```json
 [
   {
-    "AllowedOrigins": ["https://maanslogen.mathiasfoldager.com"],
+    "AllowedOrigins": ["https://maanslogen.com"],
     "AllowedMethods": ["PUT"],
     "AllowedHeaders": ["content-type"],
     "MaxAgeSeconds": 3600
@@ -90,7 +90,7 @@ manglede en nøgle.
 | `R2_ACCESS_KEY_ID`     | ✔ ved `r2`     |                                                     |
 | `R2_SECRET_ACCESS_KEY` | ✔ ved `r2`     |                                                     |
 | `R2_BUCKET`            | ✔ ved `r2`     |                                                     |
-| `R2_PUBLIC_BASE_URL`   | ✔ ved `r2`     | Fx `https://media-maanslogen.mathiasfoldager.com`   |
+| `R2_PUBLIC_BASE_URL`   | ✔ ved `r2`     | Fx `https://media.maanslogen.com`                   |
 | `THROTTLE_LIMIT`       |                | Standard 120 pr. minut                              |
 | `ENABLE_SWAGGER`       |                | Sæt `false` for at skjule `/docs`                   |
 
@@ -116,8 +116,8 @@ ved kørsel:
 
 ```bash
 docker build -f apps/web/Dockerfile \
-  --build-arg NEXT_PUBLIC_API_URL=https://api-maanslogen.mathiasfoldager.com \
-  --build-arg NEXT_PUBLIC_MEDIA_URL=https://media-maanslogen.mathiasfoldager.com \
+  --build-arg NEXT_PUBLIC_API_URL=https://api.maanslogen.com \
+  --build-arg NEXT_PUBLIC_MEDIA_URL=https://media.maanslogen.com \
   -t maanslogen-web .
 ```
 
@@ -155,22 +155,28 @@ API-kald.
 
 ### Hvad det betyder for sessioner
 
-Hver vært har sin egen session. Logger man ind på `maanslogen.…`, er man ikke
-logget ind på et eventuelt `arrangement-maanslogen.…` — det er to adskilte
-cookies, hver host-only på sin vært. For en installeret PWA er det knap nok
+Hver vært har sin egen session. Logger man ind på `maanslogen.com`, er man
+ikke logget ind på et eventuelt `arrangement.maanslogen.com` — det er to
+adskilte cookies, hver host-only på sin vært. For en installeret PWA er det knap nok
 mærkbart: man logger ind én gang, og refresh-tokenet lever en måned.
 
 Til gengæld når ingen cookie nogensinde ud over den vært den blev sat på.
 
-### Den dag der er et projekt-domæne
+### Knappen der skifter til delte sessioner
 
-`COOKIE_DOMAIN` er knappen der skifter til delte sessioner. Sat til en fælles
-forælder gælder cookien for alle værter under den.
+`COOKIE_DOMAIN` er den knap. Sat til en fælles forælder gælder cookien for
+alle værter under den.
 
-Den er ikke sat til `mathiasfoldager.com` i dag, netop fordi den så også ville
-nå alt andet der bor på det domæne. Ligger site og API en dag under
-`maanslogen.com`, kan `COOKIE_DOMAIN=maanslogen.com` sættes uden den
-indvending — det er én miljøvariabel, ingen kodeændring.
+Da navnene lå i en delt zone, var knappen reelt spærret: nærmeste fælles
+forælder var hele den zone, og dertil skulle et refresh-token ikke — det
+ville følge med til hvad som helst andet der boede på domænet. Med
+`maanslogen.com` som projektets egen zone findes den indvending ikke
+længere. `COOKIE_DOMAIN=maanslogen.com` er én miljøvariabel, ingen
+kodeændring.
+
+Den er stadig ikke sat, for den er ikke nødvendig: host-only-cookien
+ovenfor virker, og en cookie der kun når den vært der satte den, er den
+snævreste af de to. Sæt den den dag flere værter faktisk skal dele session.
 
 Sættes den, tjekker `env.ts` ved opstart at hver adresse i `CORS_ORIGINS`
 ligger under domænet. En cookie for ét domæne når aldrig et site på et andet,

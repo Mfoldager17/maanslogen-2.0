@@ -63,7 +63,7 @@ const envSchema = z
     R2_ACCESS_KEY_ID: z.string().optional(),
     R2_SECRET_ACCESS_KEY: z.string().optional(),
     R2_BUCKET: z.string().optional(),
-    /** Offentligt domæne foran bucketen, fx https://media-maanslogen.mathiasfoldager.com */
+    /** Offentligt domæne foran bucketen, fx https://media.maanslogen.com */
     R2_PUBLIC_BASE_URL: z.string().optional(),
     /**
      * Bucketen til arrangementernes billeder. Den har hverken offentligt domæne
