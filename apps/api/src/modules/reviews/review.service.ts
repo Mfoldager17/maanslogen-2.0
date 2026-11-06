@@ -149,6 +149,61 @@ export class ReviewService {
     return this.get(id);
   }
 
+  /**
+   * Gør en note fra et arrangement til skriverens anmeldelse af drikkevaren —
+   * eller lader være, og siger det ved at svare `null`.
+   *
+   * Den lader være i ét tilfælde: skriveren har allerede anmeldt drikkevaren.
+   * `Review` har `@@unique([userId, beverageId])`, så der kan kun være én, og
+   * den gamle er en stående dom der ikke skal skrives over af en enkelt aften.
+   * Noten bliver da hvad den var.
+   *
+   * Til forskel fra `create` kastes der ikke ved en dublet. Her er det ikke en
+   * bruger der prøver at anmelde to gange og skal have det at vide — det er os
+   * der går en liste igennem ved en udgivelse, og «den har du allerede» er et
+   * svar, ikke en fejl.
+   *
+   * Ingen spørgsmålssvar: en note har en vurdering og en tekst, og resten af
+   * anmeldelsesskemaet blev aldrig stillet. At gætte på svarene ville være at
+   * lægge ord i munden på folk.
+   */
+  async createFromGatheringNote(
+    userId: string,
+    beverageId: string,
+    note: { rating: number; body: string | null },
+  ): Promise<string | null> {
+    const beverage = await this.prisma.beverage.findFirst({
+      where: { id: beverageId, deletedAt: null },
+      select: { id: true },
+    });
+    if (!beverage) return null;
+
+    // Uden `deletedAt: null`: unikhedskravet er på de rå kolonner, så en række
+    // der findes, optager pladsen uanset hvad der står i feltet.
+    const eksisterende = await this.prisma.review.findFirst({
+      where: { beverageId: beverage.id, userId },
+      select: { id: true },
+    });
+    if (eksisterende) return null;
+
+    return this.prisma.$transaction(async (tx) => {
+      const review = await tx.review.create({
+        data: {
+          userId,
+          beverageId: beverage.id,
+          rating: note.rating,
+          body: note.body,
+        },
+        select: { id: true },
+      });
+
+      // Samme transaktion som i `create`: gennemsnittet kan aldrig komme ud af
+      // trit med anmeldelserne.
+      await this.recomputeRating(tx, beverage.id);
+      return review.id;
+    });
+  }
+
   async update(
     id: string,
     actor: { userId: string; role: Role },

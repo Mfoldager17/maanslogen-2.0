@@ -3,7 +3,7 @@
 import type { Route } from "next";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { Plus } from "lucide-react";
+import { Link2, Plus } from "lucide-react";
 import type { GatheringDetail, User } from "@maanslogen/contracts";
 import { api } from "@/lib/api/api.browser";
 import { useApiMutation } from "@/lib/use-mutation";
@@ -14,6 +14,7 @@ import { Panel } from "@/components/ui/panel";
 import { STATUS_ETIKETTER } from "@/lib/arrangementer";
 import { formatTime } from "@/lib/format";
 import { AddItemSheet } from "./add-item-sheet";
+import { LinkItemSheet } from "./link-item-sheet";
 
 /**
  * Værtens betjeningspanel. Alt herinde er admin-ruter i API'et; fladen
@@ -47,6 +48,9 @@ export function GatheringManager({
   const [story, setStory] = useState(detail.story ?? "");
   const [valgtBruger, setValgtBruger] = useState("");
   const [tilfoejAaben, setTilfoejAaben] = useState(false);
+  /** Posten hvis knytning er åben. Én ad gangen — arket dækker alligevel.
+   */
+  const [knytter, setKnytter] = useState<GatheringDetail["items"][number] | null>(null);
 
   const inviterede = new Set(detail.attendees.map((attendee) => attendee.userId));
   const kanInviteres = kandidater.filter((bruger) => !inviterede.has(bruger.id));
@@ -213,7 +217,23 @@ export function GatheringManager({
                 </div>
 
                 <div className="mt-2 flex items-center gap-2">
-                  {item.beverage === null ? <Badge tone="warning">Ikke i kataloget</Badge> : null}
+                  {/*
+                   * Mærkaten pegede på hullet uden at gøre noget ved det. Nu
+                   * er den vejen derhen: det er herfra man knytter posten til
+                   * kataloget, og det er dér aftenens noter bliver til
+                   * anmeldelser.
+                   */}
+                  {item.beverage === null ? (
+                    <Button
+                      variant="secondary"
+                      size="md"
+                      disabled={pending}
+                      onClick={() => setKnytter(item)}
+                    >
+                      <Link2 size={16} />
+                      Ikke i kataloget
+                    </Button>
+                  ) : null}
 
                   <div className="ml-auto flex shrink-0 gap-2">
                     {item.servedAt ? null : (
@@ -274,6 +294,18 @@ export function GatheringManager({
           onOpenChange={setTilfoejAaben}
           anledning="paa-forhaand"
         />
+
+        {knytter ? (
+          <LinkItemSheet
+            key={knytter.id}
+            gatheringId={detail.id}
+            itemId={knytter.id}
+            itemNavn={knytter.displayName}
+            udgivet={udgivet}
+            open
+            onOpenChange={(open) => !open && setKnytter(null)}
+          />
+        ) : null}
       </Panel>
 
       <Panel title="Opslaget">

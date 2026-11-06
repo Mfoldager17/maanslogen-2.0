@@ -451,6 +451,9 @@ model Review {
   beverage Beverage       @relation(fields: [beverageId], references: [id], onDelete: Cascade)
   answers  ReviewAnswer[]
 
+  /// Sat hvis anmeldelsen kom af en note fra et arrangement. Se GatheringNote.
+  gatheringNote GatheringNote?
+
   @@unique([userId, beverageId])
   @@index([beverageId, createdAt(sort: Desc)])
   @@index([userId, createdAt(sort: Desc)])
@@ -588,11 +591,29 @@ model GatheringNote {
   rating Float
   body   String?
 
+  /// Sat når noten er blevet til skriverens anmeldelse af drikkevaren.
+  ///
+  /// Det sker ved udgivelsen — dér er noten frosset og posten knyttet til
+  /// kataloget — og ved en knytning der sker bagefter. Havde en note en
+  /// anmeldelse allerede mens aftenen stod på, skulle hver rettelse af noten
+  /// følges ad med anmeldelsen, og en slettet note ville kunne slette en
+  /// stående dom. Derfor først når noten ikke kan laves om.
+  ///
+  /// Har skriveren allerede anmeldt drikkevaren, bliver feltet stående tomt:
+  /// Review har @@unique([userId, beverageId]), så der kan kun være én, og
+  /// den gamle må ikke skrives over af en aften hvor man var otte glas inde.
+  /// Noten bliver hvad den var.
+  ///
+  /// SetNull, ikke Cascade: sletter man sin anmeldelse, skal aftenens note
+  /// ikke forsvinde med den.
+  reviewId String? @unique @map("review_id") @db.Uuid
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
   item     GatheringItem     @relation(fields: [itemId], references: [id], onDelete: Cascade)
   attendee GatheringAttendee @relation(fields: [attendeeId], references: [id], onDelete: Cascade)
+  review   Review?           @relation(fields: [reviewId], references: [id], onDelete: SetNull)
 
   @@unique([itemId, attendeeId])
   @@index([itemId])

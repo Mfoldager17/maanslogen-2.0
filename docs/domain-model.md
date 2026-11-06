@@ -175,6 +175,36 @@ await this.prisma.$transaction(async (tx) => {
 og tallet drev fra virkeligheden uden mulighed for at opdage det. En e2e-test
 sammenligner nu det gemte gennemsnit med summen af rækkerne.
 
+### Fra note til anmeldelse
+
+En note fra et arrangement og en anmeldelse er ikke det samme. En anmeldelse er
+din stående dom om en drikkevare — deraf `@@unique([userId, beverageId])`, så du
+kun kan have én. En note er hvad du syntes _dén aften_. Smager I det samme et år
+senere, skal begge dele kunne stå.
+
+Men ofte er noten den eneste dom der nogensinde bliver skrevet, og så skal den
+ikke blive liggende inde i et arrangement. Derfor broen:
+
+| Hvornår                                    | Hvad der sker                                                                       |
+| ------------------------------------------ | ----------------------------------------------------------------------------------- |
+| Opslaget udgives                           | Hver note på en post der er knyttet til kataloget, bliver til skriverens anmeldelse |
+| Posten knyttes bagefter                    | Det samme, med det samme — er opslaget allerede udgivet                             |
+| Skriveren har allerede anmeldt drikkevaren | **Ingenting.** Den gamle anmeldelse bliver stående, og noten bliver en note         |
+
+`GatheringNote.reviewId` husker hvilke noter der blev forfremmet. Det er også
+det der gør omdannelsen idempotent: en note med et `reviewId` bliver ikke set på
+igen, så udgiv–lås op–udgiv laver ikke anmeldelse nummer to.
+
+**Hvorfor først ved udgivelsen,** og ikke når noten bliver skrevet: indtil da
+kan den rettes og slettes. Blev den til en anmeldelse med det samme, skulle hver
+rettelse følges ad, og en slettet note ville kunne slette en stående dom. Ved
+udgivelsen er noten frosset, og så er den et svar man kan stå ved.
+
+De omdannede noter tæller med i bedømmelsen — de _er_ anmeldelser nu, og
+`recomputeRating` kører i samme transaktion som hver enkelt. De noter der ikke
+blev omdannet, tæller ikke. Så er der én stemme pr. person pr. drikkevare, og
+en enkelt aften kan ikke vende et gennemsnit med otte deltagere.
+
 ### Smagsprofilen
 
 Fordi svarene gemmes typet — et tal i `value_number`, ikke en streng — kan

@@ -113,6 +113,7 @@ export function toNote(row: NoteRow): GatheringNote {
     authorName: row.attendee.user.displayName,
     rating: row.rating,
     body: row.body,
+    reviewId: row.reviewId,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
